@@ -373,7 +373,7 @@ viewHero model =
         , if List.isEmpty model.events then
             div [ Attr.class "hero-hint" ]
                 [ span [ Attr.class "hint-icon" ] [ text "↗" ]
-                , text "Beginne mit dem ersten relevanten Zeitfenster für deinen Praxisbericht."
+                , text "Beginne mit dem ersten relevanten Zeitfenster."
                 ]
 
           else
