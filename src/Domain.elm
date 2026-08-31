@@ -1,14 +1,19 @@
 module Domain exposing
-    ( CalendarDate
-    , ClockTime
+    ( Assignment(..)
+    , CalendarDate(..)
+    , ClockTime(..)
     , Comment(..)
     , Event
     , EventDraft
     , EventId(..)
-    , Moment
+    , Moment(..)
+    , Occurrence
+    , OccurrenceIndex(..)
     , Person(..)
     , Recurrence(..)
-    , TimeWindow
+    , TimeWindow(..)
+    , assignmentIncludes
+    , assignmentLabel
     , calendarDate
     , commentFromString
     , commentToString
@@ -22,19 +27,23 @@ module Domain exposing
     , momentDate
     , momentTime
     , occurrenceWindows
+    , occurrences
     , personLabel
     , recurrenceLabel
     , timeFromIso
     , timeToIso
     , timeWindow
+    , toggleOccurrenceCompletion
+    , updateEventFromDraft
     , windowEnd
     , windowStart
     , windowToGerman
     )
 
 {-| The domain model deliberately uses small custom types instead of a generic
-dictionary-shaped data model. Illegal calendar dates, clock times and inverted
-time windows cannot be constructed through the public API of this module.
+dictionary-shaped data model. Application code constructs calendar dates, clock
+times and time windows through the validating functions below. Their variants
+remain exposed because Lamdera's generated Evergreen migrations require them.
 -}
 
 
@@ -45,6 +54,11 @@ type EventId
 type Person
     = PersonA
     | PersonB
+
+
+type Assignment
+    = OnlyPerson Person
+    | BothPeople
 
 
 type Recurrence
@@ -87,11 +101,22 @@ type TimeWindow
         }
 
 
+type OccurrenceIndex
+    = OccurrenceIndex Int
+
+
+type alias Occurrence =
+    { index : OccurrenceIndex
+    , window : TimeWindow
+    , isCompleted : Bool
+    }
+
+
 type alias EventDraft =
     { title : String
     , window : TimeWindow
     , recurrence : Recurrence
-    , assignee : Person
+    , assignment : Assignment
     , comment : Comment
     }
 
@@ -101,8 +126,9 @@ type alias Event =
     , title : String
     , window : TimeWindow
     , recurrence : Recurrence
-    , assignee : Person
+    , assignment : Assignment
     , comment : Comment
+    , completedOccurrences : List OccurrenceIndex
     }
 
 
@@ -119,6 +145,26 @@ personLabel person =
 
         PersonB ->
             "Person B"
+
+
+assignmentLabel : Assignment -> String
+assignmentLabel assignment =
+    case assignment of
+        OnlyPerson person ->
+            personLabel person
+
+        BothPeople ->
+            "Person A & B"
+
+
+assignmentIncludes : Person -> Assignment -> Bool
+assignmentIncludes person assignment =
+    case assignment of
+        OnlyPerson assignedPerson ->
+            person == assignedPerson
+
+        BothPeople ->
+            True
 
 
 recurrenceLabel : Recurrence -> String
@@ -310,8 +356,20 @@ eventFromDraft id draft =
     , title = String.trim draft.title
     , window = draft.window
     , recurrence = draft.recurrence
-    , assignee = draft.assignee
+    , assignment = draft.assignment
     , comment = draft.comment
+    , completedOccurrences = []
+    }
+
+
+updateEventFromDraft : EventDraft -> Event -> Event
+updateEventFromDraft draft event =
+    { event
+        | title = String.trim draft.title
+        , window = draft.window
+        , recurrence = draft.recurrence
+        , assignment = draft.assignment
+        , comment = draft.comment
     }
 
 
@@ -320,7 +378,7 @@ eventToDraft event =
     { title = event.title
     , window = event.window
     , recurrence = event.recurrence
-    , assignee = event.assignee
+    , assignment = event.assignment
     , comment = event.comment
     }
 
@@ -332,6 +390,12 @@ draftIsValid draft =
 
 occurrenceWindows : Int -> Event -> List TimeWindow
 occurrenceWindows requestedCount event =
+    occurrences requestedCount event
+        |> List.map .window
+
+
+occurrences : Int -> Event -> List Occurrence
+occurrences requestedCount event =
     let
         count =
             max 1 requestedCount
@@ -349,11 +413,41 @@ occurrenceWindows requestedCount event =
     in
     case event.recurrence of
         OneTime ->
-            [ event.window ]
+            [ occurrenceFor event 0 event.window ]
 
         _ ->
             List.range 0 (count - 1)
-                |> List.map (\index -> shiftWindow (index * monthStep) event.window)
+                |> List.map
+                    (\index ->
+                        occurrenceFor event index (shiftWindow (index * monthStep) event.window)
+                    )
+
+
+occurrenceFor : Event -> Int -> TimeWindow -> Occurrence
+occurrenceFor event rawIndex window =
+    let
+        index =
+            OccurrenceIndex rawIndex
+    in
+    { index = index
+    , window = window
+    , isCompleted = List.member index event.completedOccurrences
+    }
+
+
+toggleOccurrenceCompletion : OccurrenceIndex -> Event -> Event
+toggleOccurrenceCompletion ((OccurrenceIndex rawIndex) as index) event =
+    if rawIndex < 0 || (event.recurrence == OneTime && rawIndex /= 0) then
+        event
+
+    else if List.member index event.completedOccurrences then
+        { event
+            | completedOccurrences =
+                List.filter ((/=) index) event.completedOccurrences
+        }
+
+    else
+        { event | completedOccurrences = index :: event.completedOccurrences }
 
 
 shiftWindow : Int -> TimeWindow -> TimeWindow

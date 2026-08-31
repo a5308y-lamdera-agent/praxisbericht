@@ -2,7 +2,7 @@ module Frontend exposing (app, init, update, updateFromBackend, view)
 
 import Browser exposing (UrlRequest(..))
 import Browser.Navigation as Nav
-import Domain exposing (Comment(..), Event, EventDraft, EventId, Person(..), Recurrence(..))
+import Domain exposing (Assignment(..), Comment(..), Event, EventDraft, EventId, Occurrence, Person(..), Recurrence(..))
 import Html exposing (Html, button, div, h1, h2, h3, header, input, label, main_, node, p, span, text, textarea)
 import Html.Attributes as Attr
 import Html.Events exposing (onClick, onInput)
@@ -54,7 +54,7 @@ emptyForm =
     , endDate = ""
     , endTime = "10:00"
     , recurrence = OneTime
-    , assignee = PersonA
+    , assignment = OnlyPerson PersonA
     , comment = ""
     }
 
@@ -131,8 +131,8 @@ update msg model =
         ChangeRecurrence value ->
             ( updateForm (\form -> { form | recurrence = value }) model, Cmd.none )
 
-        ChangeAssignee value ->
-            ( updateForm (\form -> { form | assignee = value }) model, Cmd.none )
+        ChangeAssignment value ->
+            ( updateForm (\form -> { form | assignment = value }) model, Cmd.none )
 
         ChangeComment value ->
             ( updateForm (\form -> { form | comment = value }) model, Cmd.none )
@@ -184,6 +184,11 @@ update msg model =
         ConfirmDelete eventId ->
             ( { model | pendingDelete = Nothing, syncState = Saving }
             , Lamdera.sendToBackend (DeleteEvent eventId)
+            )
+
+        ToggleOccurrence eventId occurrenceIndex ->
+            ( { model | syncState = Saving, notice = Nothing }
+            , Lamdera.sendToBackend (ToggleOccurrenceCompletion eventId occurrenceIndex)
             )
 
         DismissNotice ->
@@ -249,7 +254,7 @@ formToDraft form =
                                                                     { title = String.trim form.title
                                                                     , window = window
                                                                     , recurrence = form.recurrence
-                                                                    , assignee = form.assignee
+                                                                    , assignment = form.assignment
                                                                     , comment = Domain.commentFromString form.comment
                                                                     }
                                                                 )
@@ -279,7 +284,7 @@ formFromEvent event =
     , endDate = Domain.dateToIso (Domain.momentDate end)
     , endTime = Domain.timeToIso (Domain.momentTime end)
     , recurrence = event.recurrence
-    , assignee = event.assignee
+    , assignment = event.assignment
     , comment = Domain.commentToString event.comment
     }
 
@@ -385,7 +390,7 @@ viewStats : Model -> Html FrontendMsg
 viewStats model =
     let
         countFor person =
-            List.filter (\event -> event.assignee == person) model.events |> List.length
+            List.filter (\event -> Domain.assignmentIncludes person event.assignment) model.events |> List.length
 
         recurringCount =
             List.filter (\event -> event.recurrence /= OneTime) model.events |> List.length
@@ -527,7 +532,7 @@ matchesPerson filter event =
             True
 
         AssignedTo person ->
-            event.assignee == person
+            Domain.assignmentIncludes person event.assignment
 
 
 matchesRecurrence : RecurrenceFilter -> Event -> Bool
@@ -632,7 +637,7 @@ viewEventCard event =
                 [ div []
                     [ div [ Attr.class "event-badges" ]
                         [ recurrenceBadge event.recurrence
-                        , personBadge event.assignee
+                        , assignmentBadge event.assignment
                         ]
                     , h3 [ Attr.class "event-title" ] [ text event.title ]
                     ]
@@ -658,6 +663,7 @@ viewEventCard event =
                 , text (Domain.windowToGerman event.window)
                 ]
             , viewComment event.comment
+            , viewCompletionControl event
             , viewRecurrencePreview event
             ]
         ]
@@ -691,12 +697,25 @@ recurrenceBadge recurrence =
         ]
 
 
-personBadge : Person -> Html msg
-personBadge person =
+assignmentBadge : Assignment -> Html msg
+assignmentBadge assignment =
     span [ Attr.class "person-badge" ]
-        [ personAvatar person
-        , text (Domain.personLabel person)
+        [ assignmentAvatars assignment
+        , text (Domain.assignmentLabel assignment)
         ]
+
+
+assignmentAvatars : Assignment -> Html msg
+assignmentAvatars assignment =
+    case assignment of
+        OnlyPerson person ->
+            personAvatar person
+
+        BothPeople ->
+            span [ Attr.class "avatar-stack", Attr.attribute "aria-hidden" "true" ]
+                [ personAvatar PersonA
+                , personAvatar PersonB
+                ]
 
 
 personAvatar : Person -> Html msg
@@ -730,7 +749,7 @@ viewComment comment =
 
         Comment value ->
             div [ Attr.class "comment-box" ]
-                [ span [ Attr.class "comment-mark", Attr.attribute "aria-hidden" "true" ] [ text "✓" ]
+                [ span [ Attr.class "comment-mark", Attr.attribute "aria-hidden" "true" ] [ text "→" ]
                 , div []
                     [ span [ Attr.class "comment-label" ] [ text "ZU ERLEDIGEN" ]
                     , p [] [ text value ]
@@ -738,7 +757,78 @@ viewComment comment =
                 ]
 
 
-viewRecurrencePreview : Event -> Html msg
+viewCompletionControl : Event -> Html FrontendMsg
+viewCompletionControl event =
+    case event.recurrence of
+        OneTime ->
+            case List.head (Domain.occurrences 1 event) of
+                Nothing ->
+                    text ""
+
+                Just occurrence ->
+                    button
+                        [ Attr.class
+                            (if occurrence.isCompleted then
+                                "completion-toggle is-completed"
+
+                             else
+                                "completion-toggle"
+                            )
+                        , Attr.attribute "aria-pressed"
+                            (if occurrence.isCompleted then
+                                "true"
+
+                             else
+                                "false"
+                            )
+                        , onClick (ToggleOccurrence event.id occurrence.index)
+                        ]
+                        [ completionCheck occurrence.isCompleted
+                        , span [ Attr.class "completion-copy" ]
+                            [ strongText
+                                (if occurrence.isCompleted then
+                                    "Vorbereitung erledigt"
+
+                                 else
+                                    "Vorbereitung als erledigt markieren"
+                                )
+                            , smallText
+                                (if occurrence.isCompleted then
+                                    "Erneut anklicken, um den Status zurückzusetzen."
+
+                                 else
+                                    "Dieser einzelne Termin wird abgehakt."
+                                )
+                            ]
+                        ]
+
+        _ ->
+            text ""
+
+
+completionCheck : Bool -> Html msg
+completionCheck isCompleted =
+    span
+        [ Attr.class
+            (if isCompleted then
+                "completion-check is-checked"
+
+             else
+                "completion-check"
+            )
+        , Attr.attribute "aria-hidden" "true"
+        ]
+        [ text
+            (if isCompleted then
+                "✓"
+
+             else
+                ""
+            )
+        ]
+
+
+viewRecurrencePreview : Event -> Html FrontendMsg
 viewRecurrencePreview event =
     case event.recurrence of
         OneTime ->
@@ -746,22 +836,52 @@ viewRecurrencePreview event =
 
         _ ->
             div [ Attr.class "recurrence-preview" ]
-                [ span [ Attr.class "preview-label" ] [ text "TERMINFOLGE" ]
+                [ div [ Attr.class "preview-heading" ]
+                    [ span [ Attr.class "preview-label" ] [ text "SERIENINSTANZEN" ]
+                    , span [ Attr.class "preview-help" ] [ text "Einzeln abhaken" ]
+                    ]
                 , div [ Attr.class "preview-dates" ]
-                    (Domain.occurrenceWindows 3 event
-                        |> List.map
-                            (\window ->
-                                span []
-                                    [ text
-                                        (window
-                                            |> Domain.windowStart
-                                            |> Domain.momentDate
-                                            |> Domain.dateToGerman
-                                        )
-                                    ]
-                            )
-                    )
+                    (Domain.occurrences 3 event |> List.map (viewOccurrenceButton event))
                 ]
+
+
+viewOccurrenceButton : Event -> Occurrence -> Html FrontendMsg
+viewOccurrenceButton event occurrence =
+    let
+        dateLabel =
+            occurrence.window
+                |> Domain.windowStart
+                |> Domain.momentDate
+                |> Domain.dateToGerman
+
+        actionLabel =
+            if occurrence.isCompleted then
+                dateLabel ++ " wieder öffnen"
+
+            else
+                dateLabel ++ " als erledigt markieren"
+    in
+    button
+        [ Attr.class
+            (if occurrence.isCompleted then
+                "occurrence-button is-completed"
+
+             else
+                "occurrence-button"
+            )
+        , Attr.attribute "aria-label" actionLabel
+        , Attr.attribute "aria-pressed"
+            (if occurrence.isCompleted then
+                "true"
+
+             else
+                "false"
+            )
+        , onClick (ToggleOccurrence event.id occurrence.index)
+        ]
+        [ completionCheck occurrence.isCompleted
+        , span [] [ text dateLabel ]
+        ]
 
 
 shortDateParts : Domain.CalendarDate -> ( String, String )
@@ -877,10 +997,11 @@ editorDialog heading submitLabel model =
                         ]
                     ]
                 , div [ Attr.class "field" ]
-                    [ label [] [ text "Zuständige Person" ]
-                    , div [ Attr.class "choice-grid" ]
-                        [ personChoice model.form.assignee PersonA
-                        , personChoice model.form.assignee PersonB
+                    [ label [] [ text "Zuständigkeit" ]
+                    , div [ Attr.class "choice-grid assignment-grid" ]
+                        [ assignmentChoice model.form.assignment (OnlyPerson PersonA)
+                        , assignmentChoice model.form.assignment (OnlyPerson PersonB)
+                        , assignmentChoice model.form.assignment BothPeople
                         ]
                     ]
                 , field "Kommentar / zu erledigen"
@@ -960,20 +1081,20 @@ choiceButton selected message heading detail =
         ]
 
 
-personChoice : Person -> Person -> Html FrontendMsg
-personChoice selected person =
+assignmentChoice : Assignment -> Assignment -> Html FrontendMsg
+assignmentChoice selected assignment =
     button
         [ Attr.class
-            (if selected == person then
+            (if selected == assignment then
                 "choice-card person-choice is-selected"
 
              else
                 "choice-card person-choice"
             )
-        , onClick (ChangeAssignee person)
+        , onClick (ChangeAssignment assignment)
         ]
-        [ personAvatar person
-        , strongText (Domain.personLabel person)
+        [ assignmentAvatars assignment
+        , strongText (Domain.assignmentLabel assignment)
         , span [ Attr.class "radio-dot" ] []
         ]
 
@@ -1110,6 +1231,10 @@ button { color: inherit; }
 .badge-repeat { font-size: 13px; }
 .person-badge { display: inline-flex; align-items: center; gap: 6px; color: #69726c; font-size: 10px; font-weight: 750; }
 .person-badge .avatar { width: 22px; height: 22px; font-size: 9px; }
+.avatar-stack { display: inline-flex; align-items: center; padding-right: 5px; }
+.avatar-stack .avatar + .avatar { margin-left: -7px; border: 2px solid var(--surface); }
+.person-choice .avatar-stack { min-width: 42px; }
+.person-choice .avatar-stack .avatar + .avatar { border-color: white; }
 .event-title { margin: 13px 0 9px; font-family: Georgia, serif; font-size: 24px; font-weight: 500; letter-spacing: -.3px; }
 .card-actions { display: flex; gap: 5px; }
 .icon-button { width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 8px; background: white; color: #5f6962; cursor: pointer; }
@@ -1121,9 +1246,21 @@ button { color: inherit; }
 .comment-mark { width: 20px; height: 20px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 50%; background: var(--lime); color: var(--green); font-size: 10px; font-weight: 900; }
 .comment-label, .preview-label { display: block; color: #879087; font-size: 8px; font-weight: 900; letter-spacing: 1.2px; }
 .comment-box p { margin: 4px 0 0; color: #4f5b53; font-size: 11px; line-height: 1.45; white-space: pre-wrap; }
-.recurrence-preview { margin-top: 17px; padding-top: 15px; display: flex; align-items: center; gap: 18px; border-top: 1px solid #eceee8; }
-.preview-dates { display: flex; flex-wrap: wrap; gap: 7px; }
-.preview-dates span { padding: 5px 9px; background: #f0f2ec; border-radius: 5px; color: #69736c; font-size: 9px; font-weight: 700; }
+.completion-toggle { width: 100%; margin-top: 15px; padding: 11px 13px; display: flex; align-items: center; gap: 11px; text-align: left; background: white; border: 1px solid #d9ddd5; border-radius: 9px; cursor: pointer; }
+.completion-toggle:hover { border-color: #93a99a; background: #f8faf7; }
+.completion-toggle.is-completed { background: #edf5ee; border-color: #94b09b; }
+.completion-check { width: 19px; height: 19px; display: inline-grid; place-items: center; flex: 0 0 auto; border: 1px solid #9ea9a1; border-radius: 50%; color: white; font-size: 10px; font-weight: 900; }
+.completion-check.is-checked { background: var(--green); border-color: var(--green); }
+.completion-copy { display: flex; flex-direction: column; gap: 2px; }
+.completion-copy .small-text { color: #7e8881; font-size: 9px; }
+.recurrence-preview { margin-top: 17px; padding-top: 15px; border-top: 1px solid #eceee8; }
+.preview-heading { margin-bottom: 9px; display: flex; align-items: center; justify-content: space-between; }
+.preview-help { color: #8b938d; font-size: 9px; }
+.preview-dates { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.occurrence-button { min-height: 38px; padding: 6px 9px; display: flex; align-items: center; gap: 7px; background: #f0f2ec; border: 1px solid transparent; border-radius: 7px; color: #69736c; cursor: pointer; font-size: 9px; font-weight: 750; }
+.occurrence-button:hover { border-color: #bdc8bf; }.occurrence-button.is-completed { background: #e1eee3; color: var(--green); text-decoration: line-through; }
+.occurrence-button .completion-check { width: 16px; height: 16px; background: white; font-size: 8px; }
+.occurrence-button .completion-check.is-checked { background: var(--green); }
 .empty-state { padding: 58px 20px; text-align: center; background: rgba(255,254,250,.7); border: 1px dashed #cbd0c7; border-radius: 15px; }
 .empty-symbol { width: 50px; height: 50px; margin: 0 auto 17px; display: grid; place-items: center; border-radius: 50%; background: var(--green-soft); color: var(--green); font-size: 27px; }
 .empty-state h3 { margin: 0; font-family: Georgia, serif; font-size: 24px; font-weight: 500; }
@@ -1131,7 +1268,7 @@ button { color: inherit; }
 .loading-card { padding: 35px; background: var(--surface); border: 1px solid var(--line); border-radius: 15px; }
 .loading-line { width: 42%; height: 11px; margin: 13px 0; background: #e7e9e3; border-radius: 10px; animation: pulse 1.3s infinite; }
 .loading-line.wide { width: 70%; height: 18px; }.loading-line.short { width: 25%; }
-.toast { position: fixed; right: 25px; bottom: 25px; z-index: 60; min-width: 300px; padding: 14px 16px; display: flex; align-items: center; gap: 11px; background: #183b2c; color: white; border-radius: 11px; box-shadow: 0 16px 40px rgba(20,40,29,.28); font-size: 12px; }
+.toast { position: fixed; right: 25px; top: 98px; z-index: 60; min-width: 300px; padding: 14px 16px; display: flex; align-items: center; gap: 11px; background: #183b2c; color: white; border-radius: 11px; box-shadow: 0 16px 40px rgba(20,40,29,.28); font-size: 12px; }
 .toast-check { width: 21px; height: 21px; display: grid; place-items: center; background: #d7e8a7; color: #214f39; border-radius: 50%; font-size: 10px; font-weight: 900; }
 .toast-close { margin-left: auto; border: 0; background: transparent; color: #cbd8d0; cursor: pointer; font-size: 19px; }
 .modal-backdrop { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 25px; background: rgba(17,28,22,.53); backdrop-filter: blur(5px); }
@@ -1149,6 +1286,7 @@ button { color: inherit; }
 .datetime-inputs { display: grid; grid-template-columns: 1.35fr .8fr; gap: 7px; }
 .choice-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .choice-grid-three { grid-template-columns: repeat(3, 1fr); }
+.assignment-grid { grid-template-columns: repeat(3, 1fr); }
 .choice-card { min-height: 58px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; text-align: left; background: white; border: 1px solid #daddd6; border-radius: 9px; cursor: pointer; }
 .choice-card:hover { border-color: #9ca99e; }.choice-card.is-selected { background: #f1f6f2; border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
 .radio-dot { width: 14px; height: 14px; flex: 0 0 auto; border: 1px solid #a6aea8; border-radius: 50%; box-shadow: inset 0 0 0 3px white; }
@@ -1176,9 +1314,9 @@ button { color: inherit; }
   .stats-grid { grid-template-columns: 1fr 1fr; gap: 9px; }.stat-card { min-height: 135px; padding: 18px; }.people-stat { grid-column: 1 / 3; }.stat-number { font-size: 36px; }
   .events-section { margin-top: 52px; }.filter-groups { align-items: flex-start; flex-direction: column; overflow-x: visible; padding-bottom: 3px; }.filter-pills { max-width: 100%; overflow-x: auto; }.recurrence-pills { order: -1; }
   .event-card { grid-template-columns: 69px 1fr; }.date-block { padding-top: 31px; }.date-day { font-size: 31px; }.event-main { padding: 20px 17px; }.event-title { font-size: 21px; }.event-head { gap: 8px; }.person-badge { font-size: 0; }
-  .recurrence-preview { align-items: start; flex-direction: column; gap: 8px; }.preview-dates { gap: 4px; }
+  .preview-dates { grid-template-columns: 1fr; gap: 5px; }.occurrence-button { min-height: 35px; }
   .modal-backdrop { padding: 0; place-items: end center; }.editor-modal { max-height: 94vh; border-radius: 18px 18px 0 0; }.modal-header, .modal-body { padding-left: 19px; padding-right: 19px; }.modal-footer { padding: 14px 19px; }
-  .form-grid { grid-template-columns: 1fr; gap: 0; }.choice-grid-three { grid-template-columns: 1fr; }.choice-grid-three .choice-card { min-height: 49px; }
-  .toast { left: 14px; right: 14px; bottom: 14px; min-width: 0; }.delete-dialog { margin: auto 14px; }
+  .form-grid { grid-template-columns: 1fr; gap: 0; }.choice-grid-three, .assignment-grid { grid-template-columns: 1fr; }.choice-grid-three .choice-card, .assignment-grid .choice-card { min-height: 49px; }
+  .toast { left: 14px; right: 14px; top: 82px; min-width: 0; }.delete-dialog { margin: auto 14px; }
 }
 """

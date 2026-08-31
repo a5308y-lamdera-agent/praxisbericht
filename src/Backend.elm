@@ -1,6 +1,6 @@
 module Backend exposing (app, init, update, updateFromFrontend)
 
-import Domain exposing (EventId(..), draftIsValid, eventFromDraft)
+import Domain exposing (EventId(..), draftIsValid, eventFromDraft, toggleOccurrenceCompletion, updateEventFromDraft)
 import Lamdera exposing (ClientId, SessionId)
 import Types exposing (BackendModel, BackendMsg(..), ToBackend(..), ToFrontend(..))
 
@@ -69,7 +69,7 @@ updateFromFrontend _ clientId msg model =
                         List.map
                             (\event ->
                                 if event.id == eventId then
-                                    eventFromDraft eventId draft
+                                    updateEventFromDraft draft event
 
                                 else
                                     event
@@ -97,3 +97,27 @@ updateFromFrontend _ clientId msg model =
             ( nextModel
             , Lamdera.broadcast (EventsChanged nextEvents "Termin wurde gelöscht.")
             )
+
+        ToggleOccurrenceCompletion eventId occurrenceIndex ->
+            if List.any (\event -> event.id == eventId) model.events then
+                let
+                    nextEvents =
+                        List.map
+                            (\event ->
+                                if event.id == eventId then
+                                    toggleOccurrenceCompletion occurrenceIndex event
+
+                                else
+                                    event
+                            )
+                            model.events
+
+                    nextModel =
+                        { model | events = nextEvents }
+                in
+                ( nextModel
+                , Lamdera.broadcast (EventsChanged nextEvents "Erledigt-Status wurde aktualisiert.")
+                )
+
+            else
+                ( model, Lamdera.sendToFrontend clientId (ChangeRejected "Der Termin existiert nicht mehr.") )
