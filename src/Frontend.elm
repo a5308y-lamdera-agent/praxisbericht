@@ -366,22 +366,6 @@ viewHero model =
             [ span [ Attr.class "eyebrow-line" ] []
             , text "PRAXISBERICHT · TERMINMANAGEMENT"
             ]
-        , div [ Attr.class "hero-row" ]
-            [ h1 []
-                [ text "Alle wichtigen Zeitfenster."
-                , Html.br [] []
-                , span [] [ text "Klare Zuständigkeiten." ]
-                ]
-            , p [ Attr.class "hero-copy" ]
-                [ text
-                    ("Plane einmalige und wiederkehrende Ereignisse, halte Aufgaben direkt am Termin fest und verteile sie eindeutig auf "
-                        ++ Domain.personLabel PersonA
-                        ++ " oder "
-                        ++ Domain.personLabel PersonB
-                        ++ "."
-                    )
-                ]
-            ]
         , if List.isEmpty model.events then
             div [ Attr.class "hero-hint" ]
                 [ span [ Attr.class "hint-icon" ] [ text "↗" ]
