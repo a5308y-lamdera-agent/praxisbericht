@@ -141,10 +141,10 @@ personLabel : Person -> String
 personLabel person =
     case person of
         PersonA ->
-            "Person A"
+            "Antonia"
 
         PersonB ->
-            "Person B"
+            "Theresa"
 
 
 assignmentLabel : Assignment -> String
@@ -154,7 +154,7 @@ assignmentLabel assignment =
             personLabel person
 
         BothPeople ->
-            "Person A & B"
+            "Antonia & Theresa"
 
 
 assignmentIncludes : Person -> Assignment -> Bool

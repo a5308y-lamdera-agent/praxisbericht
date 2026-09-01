@@ -373,7 +373,7 @@ viewHero model =
                 , span [] [ text "Klare Zuständigkeiten." ]
                 ]
             , p [ Attr.class "hero-copy" ]
-                [ text "Plane einmalige und wiederkehrende Ereignisse, halte Aufgaben direkt am Termin fest und verteile sie eindeutig auf A oder B." ]
+                [ text "Plane einmalige und wiederkehrende Ereignisse, halte Aufgaben direkt am Termin fest und verteile sie eindeutig auf Antonia oder Theresa." ]
             ]
         , if List.isEmpty model.events then
             div [ Attr.class "hero-hint" ]
@@ -488,8 +488,8 @@ viewFilters model =
         , div [ Attr.class "filter-groups" ]
             [ div [ Attr.class "filter-pills", Attr.attribute "aria-label" "Nach Person filtern" ]
                 [ filterButton (model.personFilter == AllPeople) (ChangePersonFilter AllPeople) "Alle"
-                , filterButton (model.personFilter == AssignedTo PersonA) (ChangePersonFilter (AssignedTo PersonA)) "A"
-                , filterButton (model.personFilter == AssignedTo PersonB) (ChangePersonFilter (AssignedTo PersonB)) "B"
+                , filterButton (model.personFilter == AssignedTo PersonA) (ChangePersonFilter (AssignedTo PersonA)) "Antonia"
+                , filterButton (model.personFilter == AssignedTo PersonB) (ChangePersonFilter (AssignedTo PersonB)) "Theresa"
                 ]
             , div [ Attr.class "filter-pills recurrence-pills", Attr.attribute "aria-label" "Nach Wiederholung filtern" ]
                 [ filterButton (model.recurrenceFilter == AllRecurrences) (ChangeRecurrenceFilter AllRecurrences) "Alle Arten"
@@ -736,7 +736,7 @@ personAvatar person =
                     "A"
 
                 PersonB ->
-                    "B"
+                    "T"
             )
         ]
 
@@ -970,7 +970,8 @@ editorDialog heading submitLabel model =
                     [ div [ Attr.class "section-kicker" ] [ text "TERMINDETAILS" ]
                     , h2 [] [ text heading ]
                     ]
-                , button [ Attr.class "modal-close", onClick CloseEditor, Attr.attribute "aria-label" "Dialog schließen" ] [ text "×" ]
+                , button [ Attr.class "modal-close", onClick CloseEditor, Attr.attribute "aria-label" "Dialog schließen" ]
+                    [ span [ Attr.class "close-glyph", Attr.attribute "aria-hidden" "true" ] [ text "×" ] ]
                 ]
             , div [ Attr.class "modal-body" ]
                 [ field "Titel"
@@ -1275,7 +1276,8 @@ button { color: inherit; }
 .editor-modal { width: min(710px, 100%); max-height: calc(100vh - 50px); display: flex; flex-direction: column; background: var(--surface); border-radius: 18px; box-shadow: 0 30px 90px rgba(15,28,20,.3); overflow: hidden; }
 .modal-header { padding: 25px 30px 20px; display: flex; align-items: start; justify-content: space-between; border-bottom: 1px solid var(--line); }
 .modal-header h2 { font-size: 29px; }
-.modal-close { width: 35px; height: 35px; border: 0; border-radius: 50%; background: #eff0ea; color: #59645d; cursor: pointer; font-size: 21px; }
+.modal-close { width: 35px; height: 35px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 50%; background: #eff0ea; color: #59645d; cursor: pointer; font-size: 21px; line-height: 1; }
+.close-glyph { display: block; transform: translateY(-1px); }
 .modal-body { padding: 24px 30px; overflow-y: auto; }
 .field { margin-bottom: 19px; }
 .field > label { display: block; margin-bottom: 8px; color: #4d5851; font-size: 10px; font-weight: 850; letter-spacing: .7px; text-transform: uppercase; }

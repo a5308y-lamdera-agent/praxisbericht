@@ -2,8 +2,8 @@
 
 PraxisPlan ist eine kleine Lamdera-Anwendung zur gemeinsamen Terminplanung für
 einen Praxisbericht. Ereignisse besitzen ein konkretes Zeitfenster, können
-einmalig, semesterweise oder jährlich stattfinden und sind eindeutig Person A,
-Person B oder beiden Personen gemeinsam zugeordnet.
+einmalig, semesterweise oder jährlich stattfinden und sind eindeutig Antonia,
+Theresa oder beiden Personen gemeinsam zugeordnet.
 
 ## Lokal starten
 
@@ -19,7 +19,7 @@ Das Domänenmodell liegt in `src/Domain.elm`. Statt generischer `Dict`-Strukture
 verwendet es fachliche Typen:
 
 - `EventId` für stabile Identitäten
-- `Person` mit genau den Varianten `PersonA` und `PersonB`
+- `Person` mit den stabilen Varianten `PersonA` (Antonia) und `PersonB` (Theresa)
 - `Assignment` für A, B oder eine gemeinsame Zuständigkeit
 - `Recurrence` mit `OneTime`, `EverySemester` und `EveryYear`
 - `OccurrenceIndex` für den Erledigt-Status einer einzelnen Serieninstanz
