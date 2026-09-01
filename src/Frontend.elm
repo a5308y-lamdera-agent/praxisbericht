@@ -1176,8 +1176,8 @@ button { color: inherit; }
 .hero-copy { margin: 0 0 4px; color: var(--muted); line-height: 1.72; font-size: 15px; max-width: 410px; }
 .hero-hint { margin-top: 34px; display: inline-flex; align-items: center; gap: 12px; color: var(--muted); font-size: 12px; }
 .hint-icon { width: 26px; height: 26px; display: grid; place-items: center; border: 1px solid #bdc5bc; border-radius: 50%; color: var(--green); }
-.stats-grid { display: grid; grid-template-columns: 1fr 1fr 1.35fr; gap: 16px; }
-.stat-card { min-height: 155px; padding: 23px 25px; background: rgba(255,254,250,.86); border: 1px solid var(--line); border-radius: 15px; box-shadow: 0 3px 14px rgba(36,48,39,.035); }
+.stats-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.35fr); gap: 16px; }
+.stat-card { min-width: 0; min-height: 155px; padding: 23px 25px; background: rgba(255,254,250,.86); border: 1px solid var(--line); border-radius: 15px; box-shadow: 0 3px 14px rgba(36,48,39,.035); }
 .stat-top { display: flex; justify-content: space-between; align-items: center; }
 .stat-heading { color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
 .stat-icon { width: 31px; height: 31px; display: grid; place-items: center; border-radius: 8px; background: var(--green-soft); color: var(--green); font-size: 18px; }
@@ -1215,6 +1215,7 @@ button { color: inherit; }
 .date-day { margin-top: 6px; font-family: Georgia, serif; font-size: 40px; line-height: 1; }
 .event-main { padding: 25px 29px 22px; min-width: 0; }
 .event-head { display: flex; justify-content: space-between; gap: 20px; }
+.event-head > div:first-child { min-width: 0; }
 .event-badges { display: flex; align-items: center; gap: 8px; }
 .badge { min-height: 23px; padding: 0 9px; display: inline-flex; align-items: center; gap: 5px; border-radius: 20px; font-size: 9px; font-weight: 850; letter-spacing: .45px; text-transform: uppercase; }
 .badge-once { background: #ebede8; color: #667169; }
@@ -1228,7 +1229,7 @@ button { color: inherit; }
 .person-choice .avatar-stack { min-width: 42px; }
 .person-choice .avatar-stack .avatar + .avatar { border-color: white; }
 .event-title { margin: 13px 0 9px; font-family: Georgia, serif; font-size: 24px; font-weight: 500; letter-spacing: -.3px; }
-.card-actions { display: flex; gap: 5px; }
+.card-actions { display: flex; flex: 0 0 auto; gap: 5px; }
 .icon-button { width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 8px; background: white; color: #5f6962; cursor: pointer; }
 .icon-button:hover { background: #f2f4ef; }
 .icon-button.danger:hover { color: #a7433d; background: #faeeee; border-color: #ecd0ce; }
@@ -1273,10 +1274,12 @@ button { color: inherit; }
 .field { margin-bottom: 19px; }
 .field > label { display: block; margin-bottom: 8px; color: #4d5851; font-size: 10px; font-weight: 850; letter-spacing: .7px; text-transform: uppercase; }
 .required { color: var(--orange); }.optional { color: #a2a8a3; font-weight: 550; letter-spacing: 0; text-transform: none; }
-.field input, .field textarea { width: 100%; padding: 0 13px; background: white; border: 1px solid #d9ddd5; border-radius: 9px; outline: 0; color: var(--ink); font-size: 12px; }
+.field { min-width: 0; }
+.field input, .field textarea { width: 100%; min-width: 0; max-width: 100%; padding: 0 13px; background: white; border: 1px solid #d9ddd5; border-radius: 9px; outline: 0; color: var(--ink); font-size: 12px; }
 .field input { height: 43px; }.field textarea { min-height: 92px; padding-top: 12px; resize: vertical; line-height: 1.5; }
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-.datetime-inputs { display: grid; grid-template-columns: 1.35fr .8fr; gap: 7px; }
+.form-grid { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 15px; }
+.datetime-inputs { min-width: 0; display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, .8fr); gap: 7px; }
+.datetime-inputs input { min-width: 0; max-width: 100%; }
 .choice-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .choice-grid-three { grid-template-columns: repeat(3, 1fr); }
 .assignment-grid { grid-template-columns: repeat(3, 1fr); }
@@ -1304,12 +1307,12 @@ button { color: inherit; }
 @media (max-width: 620px) {
   .topbar { height: 70px; padding: 0 18px; }.brand-subtitle, .hide-mobile { display: none; }.brand-mark { width: 36px; height: 36px; }.brand-name { font-size: 18px; }
   .topbar .button { min-height: 39px; padding: 0 13px; }.page { width: calc(100% - 28px); }.hero { padding: 50px 0 36px; }.hero h1 { font-size: 41px; letter-spacing: -1.8px; }
-  .stats-grid { grid-template-columns: 1fr 1fr; gap: 9px; }.stat-card { min-height: 135px; padding: 18px; }.people-stat { grid-column: 1 / 3; }.stat-number { font-size: 36px; }
+  .stats-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 9px; }.stat-card { min-height: 135px; padding: 18px; }.people-stat { grid-column: 1 / -1; }.stat-number { font-size: 36px; }
   .events-section { margin-top: 52px; }.filter-groups { align-items: flex-start; flex-direction: column; overflow-x: visible; padding-bottom: 3px; }.filter-pills { max-width: 100%; overflow-x: auto; }.recurrence-pills { order: -1; }
   .event-card { grid-template-columns: 69px 1fr; }.date-block { padding-top: 31px; }.date-day { font-size: 31px; }.event-main { padding: 20px 17px; }.event-title { font-size: 21px; }.event-head { gap: 8px; }.person-badge { font-size: 0; }
   .preview-dates { grid-template-columns: 1fr; gap: 5px; }.occurrence-button { min-height: 35px; }
   .modal-backdrop { padding: 0; place-items: end center; }.editor-modal { max-height: 94vh; border-radius: 18px 18px 0 0; }.modal-header, .modal-body { padding-left: 19px; padding-right: 19px; }.modal-footer { padding: 14px 19px; }
-  .form-grid { grid-template-columns: 1fr; gap: 0; }.choice-grid-three, .assignment-grid { grid-template-columns: 1fr; }.choice-grid-three .choice-card, .assignment-grid .choice-card { min-height: 49px; }
+  .field input, .field textarea { font-size: 16px; }.form-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }.datetime-inputs { grid-template-columns: minmax(0, 1fr) minmax(105px, .52fr); }.choice-grid-three, .assignment-grid { grid-template-columns: 1fr; }.choice-grid-three .choice-card, .assignment-grid .choice-card { min-height: 49px; }
   .toast { left: 14px; right: 14px; top: 82px; min-width: 0; }.delete-dialog { margin: auto 14px; }
 }
 """
