@@ -373,7 +373,14 @@ viewHero model =
                 , span [] [ text "Klare Zuständigkeiten." ]
                 ]
             , p [ Attr.class "hero-copy" ]
-                [ text "Plane einmalige und wiederkehrende Ereignisse, halte Aufgaben direkt am Termin fest und verteile sie eindeutig auf Antonia oder Theresa." ]
+                [ text
+                    ("Plane einmalige und wiederkehrende Ereignisse, halte Aufgaben direkt am Termin fest und verteile sie eindeutig auf "
+                        ++ Domain.personLabel PersonA
+                        ++ " oder "
+                        ++ Domain.personLabel PersonB
+                        ++ "."
+                    )
+                ]
             ]
         , if List.isEmpty model.events then
             div [ Attr.class "hero-hint" ]
@@ -488,8 +495,8 @@ viewFilters model =
         , div [ Attr.class "filter-groups" ]
             [ div [ Attr.class "filter-pills", Attr.attribute "aria-label" "Nach Person filtern" ]
                 [ filterButton (model.personFilter == AllPeople) (ChangePersonFilter AllPeople) "Alle"
-                , filterButton (model.personFilter == AssignedTo PersonA) (ChangePersonFilter (AssignedTo PersonA)) "Antonia"
-                , filterButton (model.personFilter == AssignedTo PersonB) (ChangePersonFilter (AssignedTo PersonB)) "Theresa"
+                , filterButton (model.personFilter == AssignedTo PersonA) (ChangePersonFilter (AssignedTo PersonA)) (Domain.personLabel PersonA)
+                , filterButton (model.personFilter == AssignedTo PersonB) (ChangePersonFilter (AssignedTo PersonB)) (Domain.personLabel PersonB)
                 ]
             , div [ Attr.class "filter-pills recurrence-pills", Attr.attribute "aria-label" "Nach Wiederholung filtern" ]
                 [ filterButton (model.recurrenceFilter == AllRecurrences) (ChangeRecurrenceFilter AllRecurrences) "Alle Arten"

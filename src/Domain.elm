@@ -154,7 +154,7 @@ assignmentLabel assignment =
             personLabel person
 
         BothPeople ->
-            "Antonia & Theresa"
+            personLabel PersonA ++ " & " ++ personLabel PersonB
 
 
 assignmentIncludes : Person -> Assignment -> Bool
