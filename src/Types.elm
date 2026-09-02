@@ -38,6 +38,7 @@ type alias EventForm =
 type EditorState
     = EditorClosed
     | CreatingEvent
+    | DuplicatingEvent
     | EditingEvent EventId
 
 
@@ -82,6 +83,7 @@ type FrontendMsg
     = UrlClicked UrlRequest
     | UrlChanged Url
     | OpenCreateEditor
+    | OpenDuplicateEditor EventId
     | OpenEditEditor EventId
     | CloseEditor
     | ChangeTitle String

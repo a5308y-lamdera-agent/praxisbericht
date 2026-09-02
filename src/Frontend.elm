@@ -94,6 +94,21 @@ update msg model =
             , Cmd.none
             )
 
+        OpenDuplicateEditor eventId ->
+            case findEvent eventId model.events of
+                Just event ->
+                    ( { model
+                        | editor = DuplicatingEvent
+                        , form = formFromEvent event
+                        , formError = Nothing
+                        , notice = Nothing
+                      }
+                    , Cmd.none
+                    )
+
+                Nothing ->
+                    ( { model | notice = Just "Der Termin wurde nicht gefunden." }, Cmd.none )
+
         OpenEditEditor eventId ->
             case findEvent eventId model.events of
                 Just event ->
@@ -159,6 +174,11 @@ update msg model =
                             ( model, Cmd.none )
 
                         CreatingEvent ->
+                            ( savingModel model
+                            , Lamdera.sendToBackend (CreateEvent draft)
+                            )
+
+                        DuplicatingEvent ->
                             ( savingModel model
                             , Lamdera.sendToBackend (CreateEvent draft)
                             )
@@ -837,6 +857,13 @@ viewEventCard filter event =
                 , div [ Attr.class "card-actions" ]
                     [ button
                         [ Attr.class "icon-button"
+                        , Attr.title "Termin kopieren"
+                        , Attr.attribute "aria-label" "Termin kopieren"
+                        , onClick (OpenDuplicateEditor event.id)
+                        ]
+                        [ text "⧉" ]
+                    , button
+                        [ Attr.class "icon-button"
                         , Attr.title "Termin bearbeiten"
                         , Attr.attribute "aria-label" "Termin bearbeiten"
                         , onClick (OpenEditEditor event.id)
@@ -1157,6 +1184,9 @@ viewEditor model =
         CreatingEvent ->
             editorDialog "Neuen Termin planen" "Zeitfenster anlegen" model
 
+        DuplicatingEvent ->
+            editorDialog "Kopie bearbeiten" "Kopie anlegen" model
+
         EditingEvent _ ->
             editorDialog "Termin bearbeiten" "Änderungen speichern" model
 
@@ -1446,7 +1476,7 @@ button { color: inherit; }
 .person-choice .avatar-stack .avatar + .avatar { border-color: white; }
 .event-title { margin: 13px 0 9px; font-family: Georgia, serif; font-size: 24px; font-weight: 500; letter-spacing: -.3px; }
 .card-actions { display: flex; flex: 0 0 auto; gap: 5px; }
-.icon-button { width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 8px; background: white; color: #5f6962; cursor: pointer; }
+.icon-button { width: 34px; height: 34px; padding: 0; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: white; color: #5f6962; cursor: pointer; line-height: 1; }
 .icon-button:hover { background: #f2f4ef; }
 .icon-button.danger:hover { color: #a7433d; background: #faeeee; border-color: #ecd0ce; }
 .event-time { display: flex; align-items: center; gap: 7px; color: #667069; font-size: 12px; }

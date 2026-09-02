@@ -38,8 +38,10 @@ erledigen.
 
 Das Lamdera-Backend in `src/Backend.elm` vergibt IDs, hält die Terminliste und
 synchronisiert jede Änderung an alle verbundenen Clients. Die Oberfläche in
-`src/Frontend.elm` bietet Erstellen, Bearbeiten, Löschen, Suche, Filter und eine
-Vorschau wiederkehrender Termine mit einzeln abhakbaren Instanzen.
+`src/Frontend.elm` bietet Erstellen, Kopieren, Bearbeiten, Löschen, Suche,
+Filter und eine Vorschau wiederkehrender Termine mit einzeln abhakbaren
+Instanzen. Beim Kopieren werden die Termindetails in einen neuen Entwurf
+übernommen; Erledigt-Zustände bleiben bewusst beim Original.
 
 Die Terminliste kann zusätzlich entweder nach einem Kalendermonat unabhängig
 vom Jahr oder nach einem frei gewählten, inklusiven Datumsbereich gefiltert
