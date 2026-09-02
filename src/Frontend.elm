@@ -625,13 +625,15 @@ viewDateFilter model =
                 text ""
 
             _ ->
-                div [ Attr.class "active-date-filter" ]
-                    [ span [] [ text (dateFilterLabel model.dateFilter) ]
-                    , button
-                        [ onClick ClearDateFilter
-                        , Attr.attribute "aria-label" "Datumsfilter entfernen"
+                div [ Attr.class "active-date-filter-row" ]
+                    [ div [ Attr.class "active-date-filter" ]
+                        [ span [] [ text (dateFilterLabel model.dateFilter) ]
+                        , button
+                            [ onClick ClearDateFilter
+                            , Attr.attribute "aria-label" "Datumsfilter entfernen"
+                            ]
+                            [ text "×" ]
                         ]
-                        [ text "×" ]
                     ]
         , case model.dateFilterForm.error of
             Nothing ->
@@ -1420,7 +1422,7 @@ button { color: inherit; }
 .date-filter-controls { min-width: 0; display: flex; align-items: flex-end; gap: 12px; }.range-fields { min-width: 0; display: flex; align-items: flex-end; gap: 7px; }
 .date-filter-field { min-width: 0; display: flex; flex-direction: column; gap: 5px; color: #68726c; font-size: 8px; font-weight: 850; letter-spacing: .7px; text-transform: uppercase; }.date-filter-field input, .date-filter-field select { width: 132px; min-width: 0; height: 36px; padding: 0 9px; background: white; border: 1px solid #d9ddd5; border-radius: 8px; outline: 0; color: var(--ink); font-size: 11px; }.date-filter-field input:focus, .date-filter-field select:focus { border-color: #6e8f7a; box-shadow: 0 0 0 3px rgba(33,84,61,.09); }.month-field select { width: 166px; }
 .filter-or { width: 36px; height: 36px; display: grid; place-items: center; flex: 0 0 36px; align-self: flex-end; color: #a0a7a1; font-size: 8px; font-weight: 850; letter-spacing: 1px; }.apply-range-button { height: 36px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--green); color: white; cursor: pointer; font-size: 10px; font-weight: 800; }
-.active-date-filter { min-height: 30px; padding: 4px 5px 4px 10px; display: flex; align-items: center; gap: 8px; align-self: center; background: var(--lime); border-radius: 20px; color: var(--green); font-size: 9px; font-weight: 800; }.active-date-filter button { width: 22px; height: 22px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 50%; background: rgba(255,255,255,.65); color: var(--green); cursor: pointer; font-size: 15px; line-height: 1; }
+.active-date-filter-row { width: 100%; flex: 0 0 100%; display: flex; }.active-date-filter { min-height: 30px; padding: 4px 5px 4px 10px; display: flex; align-items: center; gap: 8px; background: var(--lime); border-radius: 20px; color: var(--green); font-size: 9px; font-weight: 800; }.active-date-filter button { width: 22px; height: 22px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 50%; background: rgba(255,255,255,.65); color: var(--green); cursor: pointer; font-size: 15px; line-height: 1; }
 .date-filter-error { flex-basis: 100%; margin-top: -8px; color: #a7433d; font-size: 10px; }
 .event-list { display: grid; gap: 12px; }
 .event-card { display: grid; grid-template-columns: 104px 1fr; min-height: 210px; background: var(--surface); border: 1px solid var(--line); border-radius: 15px; overflow: hidden; transition: border-color .18s, box-shadow .18s, transform .18s; }
@@ -1516,7 +1518,7 @@ button { color: inherit; }
   .hero-row { grid-template-columns: 1fr; gap: 24px; }.hero-copy { max-width: 600px; }
   .stats-grid { grid-template-columns: 1fr 1fr; }.people-stat { grid-column: 1 / 3; }
   .filterbar { align-items: stretch; flex-direction: column; }.search-wrap { max-width: none; }.filter-groups { justify-content: space-between; }
-  .date-filter-heading { width: 100%; }.date-filter-controls { flex: 1; }.active-date-filter { margin-left: auto; }
+  .date-filter-heading { width: 100%; }.date-filter-controls { flex: 1; }
 }
 
 @media (max-width: 620px) {
@@ -1524,7 +1526,7 @@ button { color: inherit; }
   .topbar .button { min-height: 39px; padding: 0 13px; }.page { width: calc(100% - 28px); }.hero { padding: 50px 0 36px; }.hero h1 { font-size: 41px; letter-spacing: -1.8px; }
   .stats-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 9px; }.stat-card { min-height: 135px; padding: 18px; }.people-stat { grid-column: 1 / -1; }.stat-number { font-size: 36px; }
   .events-section { margin-top: 52px; }.filter-groups { align-items: flex-start; flex-direction: column; overflow-x: visible; padding-bottom: 3px; }.filter-pills { max-width: 100%; overflow-x: auto; }.recurrence-pills { order: -1; }
-  .date-filter-panel { padding: 13px; align-items: stretch; flex-direction: column; gap: 13px; }.date-filter-heading { width: auto; min-width: 0; margin: 0; }.date-filter-controls { width: 100%; align-items: stretch; flex-direction: column; gap: 9px; }.filter-or { display: none; }.month-field select { width: 100%; }.range-fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; }.date-filter-field input, .date-filter-field select { width: 100%; max-width: 100%; font-size: 16px; }.apply-range-button { grid-column: 1 / -1; }.active-date-filter { margin: 0; align-self: flex-start; }.date-filter-error { margin-top: -4px; }
+  .date-filter-panel { padding: 13px; align-items: stretch; flex-direction: column; gap: 13px; }.date-filter-heading { width: auto; min-width: 0; margin: 0; }.date-filter-controls { width: 100%; align-items: stretch; flex-direction: column; gap: 9px; }.filter-or { display: none; }.month-field select { width: 100%; }.range-fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; }.date-filter-field input, .date-filter-field select { width: 100%; max-width: 100%; font-size: 16px; }.apply-range-button { grid-column: 1 / -1; }.date-filter-error { margin-top: -4px; }
   .event-card { grid-template-columns: 69px 1fr; }.date-block { padding-top: 31px; }.date-day { font-size: 31px; }.event-main { padding: 20px 17px; }.event-title { font-size: 21px; }.event-head { gap: 8px; }.person-badge { font-size: 0; }
   .preview-dates { grid-template-columns: 1fr; gap: 5px; }.occurrence-button { min-height: 35px; }
   .modal-backdrop { padding: 0; place-items: end center; }.editor-modal { max-height: 94vh; border-radius: 18px 18px 0 0; }.modal-header, .modal-body { padding-left: 19px; padding-right: 19px; }.modal-footer { padding: 14px 19px; }
