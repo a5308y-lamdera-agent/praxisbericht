@@ -36,6 +36,8 @@ init _ key =
       , editor = EditorClosed
       , personFilter = AllPeople
       , recurrenceFilter = AllRecurrences
+      , dateFilter = AllDates
+      , dateFilterForm = emptyDateFilterForm
       , search = ""
       , formError = Nothing
       , syncState = Loading
@@ -56,6 +58,15 @@ emptyForm =
     , recurrence = OneTime
     , assignment = OnlyPerson PersonA
     , comment = ""
+    }
+
+
+emptyDateFilterForm : DateFilterForm
+emptyDateFilterForm =
+    { month = ""
+    , rangeStart = ""
+    , rangeEnd = ""
+    , error = Nothing
     }
 
 
@@ -163,6 +174,63 @@ update msg model =
         ChangeRecurrenceFilter value ->
             ( { model | recurrenceFilter = value }, Cmd.none )
 
+        ChangeMonthFilter value ->
+            let
+                currentForm =
+                    model.dateFilterForm
+
+                nextForm =
+                    { currentForm | month = value, error = Nothing }
+            in
+            if String.isEmpty value then
+                ( { model | dateFilter = AllDates, dateFilterForm = nextForm }, Cmd.none )
+
+            else
+                case Domain.yearMonthFromIso value of
+                    Ok selectedMonth ->
+                        ( { model | dateFilter = InMonth selectedMonth, dateFilterForm = nextForm }, Cmd.none )
+
+                    Err problem ->
+                        ( { model | dateFilterForm = { nextForm | error = Just problem } }, Cmd.none )
+
+        ChangeRangeStart value ->
+            let
+                currentForm =
+                    model.dateFilterForm
+            in
+            ( { model | dateFilterForm = { currentForm | rangeStart = value, error = Nothing } }, Cmd.none )
+
+        ChangeRangeEnd value ->
+            let
+                currentForm =
+                    model.dateFilterForm
+            in
+            ( { model | dateFilterForm = { currentForm | rangeEnd = value, error = Nothing } }, Cmd.none )
+
+        ApplyDateRange ->
+            case Domain.calendarRangeFromIso model.dateFilterForm.rangeStart model.dateFilterForm.rangeEnd of
+                Ok range ->
+                    let
+                        currentForm =
+                            model.dateFilterForm
+                    in
+                    ( { model
+                        | dateFilter = InRange range
+                        , dateFilterForm = { currentForm | error = Nothing }
+                      }
+                    , Cmd.none
+                    )
+
+                Err problem ->
+                    let
+                        currentForm =
+                            model.dateFilterForm
+                    in
+                    ( { model | dateFilterForm = { currentForm | error = Just problem } }, Cmd.none )
+
+        ClearDateFilter ->
+            ( { model | dateFilter = AllDates, dateFilterForm = emptyDateFilterForm }, Cmd.none )
+
         ChangeSearch value ->
             ( { model | search = value }, Cmd.none )
 
@@ -170,6 +238,8 @@ update msg model =
             ( { model
                 | personFilter = AllPeople
                 , recurrenceFilter = AllRecurrences
+                , dateFilter = AllDates
+                , dateFilterForm = emptyDateFilterForm
                 , search = ""
               }
             , Cmd.none
@@ -449,6 +519,7 @@ viewEventSection model =
                 [ text (String.fromInt (List.length events) ++ " angezeigt") ]
             ]
         , viewFilters model
+        , viewDateFilter model
         , case model.syncState of
             Loading ->
                 viewLoading
@@ -458,7 +529,7 @@ viewEventSection model =
                     viewEmptyState model
 
                 else
-                    div [ Attr.class "event-list" ] (List.map viewEventCard events)
+                    div [ Attr.class "event-list" ] (List.map (viewEventCard model.dateFilter) events)
         ]
 
 
@@ -492,6 +563,88 @@ viewFilters model =
         ]
 
 
+viewDateFilter : Model -> Html FrontendMsg
+viewDateFilter model =
+    div [ Attr.class "date-filter-panel" ]
+        [ div [ Attr.class "date-filter-heading" ]
+            [ span [ Attr.class "date-filter-icon", Attr.attribute "aria-hidden" "true" ] [ text "◫" ]
+            , div []
+                [ span [ Attr.class "date-filter-title" ] [ text "Nach Zeitraum filtern" ]
+                , span [ Attr.class "date-filter-subtitle" ] [ text "Monat direkt wählen oder freien Zeitraum anwenden" ]
+                ]
+            ]
+        , div [ Attr.class "date-filter-controls" ]
+            [ label [ Attr.class "date-filter-field month-field" ]
+                [ span [] [ text "Monat" ]
+                , input
+                    [ Attr.type_ "month"
+                    , Attr.value model.dateFilterForm.month
+                    , Attr.attribute "aria-label" "Monat auswählen"
+                    , onInput ChangeMonthFilter
+                    ]
+                    []
+                ]
+            , span [ Attr.class "filter-or" ] [ text "ODER" ]
+            , div [ Attr.class "range-fields" ]
+                [ label [ Attr.class "date-filter-field" ]
+                    [ span [] [ text "Von" ]
+                    , input
+                        [ Attr.type_ "date"
+                        , Attr.value model.dateFilterForm.rangeStart
+                        , Attr.attribute "aria-label" "Zeitraum von"
+                        , onInput ChangeRangeStart
+                        ]
+                        []
+                    ]
+                , label [ Attr.class "date-filter-field" ]
+                    [ span [] [ text "Bis" ]
+                    , input
+                        [ Attr.type_ "date"
+                        , Attr.value model.dateFilterForm.rangeEnd
+                        , Attr.attribute "aria-label" "Zeitraum bis"
+                        , onInput ChangeRangeEnd
+                        ]
+                        []
+                    ]
+                , button [ Attr.class "apply-range-button", onClick ApplyDateRange ]
+                    [ text "Anwenden" ]
+                ]
+            ]
+        , case model.dateFilter of
+            AllDates ->
+                text ""
+
+            _ ->
+                div [ Attr.class "active-date-filter" ]
+                    [ span [] [ text (dateFilterLabel model.dateFilter) ]
+                    , button
+                        [ onClick ClearDateFilter
+                        , Attr.attribute "aria-label" "Datumsfilter entfernen"
+                        ]
+                        [ text "×" ]
+                    ]
+        , case model.dateFilterForm.error of
+            Nothing ->
+                text ""
+
+            Just problem ->
+                div [ Attr.class "date-filter-error", Attr.attribute "role" "alert" ] [ text problem ]
+        ]
+
+
+dateFilterLabel : DateFilter -> String
+dateFilterLabel filter =
+    case filter of
+        AllDates ->
+            "Alle Zeiträume"
+
+        InMonth selectedMonth ->
+            "Monat: " ++ Domain.yearMonthToGerman selectedMonth
+
+        InRange range ->
+            "Zeitraum: " ++ Domain.calendarRangeToGerman range
+
+
 filterButton : Bool -> msg -> String -> Html msg
 filterButton isActive message caption =
     button
@@ -512,8 +665,9 @@ visibleEvents model =
     model.events
         |> List.filter (matchesPerson model.personFilter)
         |> List.filter (matchesRecurrence model.recurrenceFilter)
+        |> List.filter (matchesDateFilter model.dateFilter)
         |> List.filter (matchesSearch model.search)
-        |> List.sortBy eventSortKey
+        |> List.sortBy (eventSortKey model.dateFilter)
 
 
 matchesPerson : PersonFilter -> Event -> Bool
@@ -536,6 +690,29 @@ matchesRecurrence filter event =
             event.recurrence == recurrence
 
 
+matchesDateFilter : DateFilter -> Event -> Bool
+matchesDateFilter filter event =
+    case dateFilterRange filter of
+        Nothing ->
+            True
+
+        Just range ->
+            Domain.eventOverlapsRange range event
+
+
+dateFilterRange : DateFilter -> Maybe Domain.CalendarRange
+dateFilterRange filter =
+    case filter of
+        AllDates ->
+            Nothing
+
+        InMonth selectedMonth ->
+            Just (Domain.yearMonthToRange selectedMonth)
+
+        InRange range ->
+            Just range
+
+
 matchesSearch : String -> Event -> Bool
 matchesSearch search event =
     let
@@ -548,11 +725,13 @@ matchesSearch search event =
     String.isEmpty needle || String.contains needle haystack
 
 
-eventSortKey : Event -> String
-eventSortKey event =
+eventSortKey : DateFilter -> Event -> String
+eventSortKey filter event =
     let
         start =
-            Domain.windowStart event.window
+            occurrenceForFilter filter event
+                |> Maybe.map (.window >> Domain.windowStart)
+                |> Maybe.withDefault (Domain.windowStart event.window)
     in
     Domain.dateToIso (Domain.momentDate start) ++ Domain.timeToIso (Domain.momentTime start)
 
@@ -575,6 +754,8 @@ viewEmptyState model =
                 /= AllPeople
                 || model.recurrenceFilter
                 /= AllRecurrences
+                || model.dateFilter
+                /= AllDates
     in
     div [ Attr.class "empty-state" ]
         [ div [ Attr.class "empty-symbol" ] [ text "◇" ]
@@ -609,11 +790,24 @@ viewEmptyState model =
         ]
 
 
-viewEventCard : Event -> Html FrontendMsg
-viewEventCard event =
+viewEventCard : DateFilter -> Event -> Html FrontendMsg
+viewEventCard filter event =
     let
+        displayedOccurrence =
+            occurrenceForFilter filter event
+
+        displayedWindow =
+            displayedOccurrence
+                |> Maybe.map .window
+                |> Maybe.withDefault event.window
+
+        previewStart =
+            displayedOccurrence
+                |> Maybe.map .index
+                |> Maybe.withDefault (Domain.OccurrenceIndex 0)
+
         startDate =
-            Domain.windowStart event.window |> Domain.momentDate
+            Domain.windowStart displayedWindow |> Domain.momentDate
 
         ( day, month ) =
             shortDateParts startDate
@@ -651,13 +845,23 @@ viewEventCard event =
                 ]
             , div [ Attr.class "event-time" ]
                 [ span [ Attr.class "time-icon", Attr.attribute "aria-hidden" "true" ] [ text "◷" ]
-                , text (Domain.windowToGerman event.window)
+                , text (Domain.windowToGerman displayedWindow)
                 ]
             , viewComment event.comment
             , viewCompletionControl event
-            , viewRecurrencePreview event
+            , viewRecurrencePreview previewStart event
             ]
         ]
+
+
+occurrenceForFilter : DateFilter -> Event -> Maybe Occurrence
+occurrenceForFilter filter event =
+    case dateFilterRange filter of
+        Nothing ->
+            Domain.occurrences 1 event |> List.head
+
+        Just range ->
+            Domain.firstOccurrenceOverlapping range event
 
 
 recurrenceBadge : Recurrence -> Html msg
@@ -819,8 +1023,8 @@ completionCheck isCompleted =
         ]
 
 
-viewRecurrencePreview : Event -> Html FrontendMsg
-viewRecurrencePreview event =
+viewRecurrencePreview : Domain.OccurrenceIndex -> Event -> Html FrontendMsg
+viewRecurrencePreview previewStart event =
     case event.recurrence of
         OneTime ->
             text ""
@@ -832,7 +1036,7 @@ viewRecurrencePreview event =
                     , span [ Attr.class "preview-help" ] [ text "Einzeln abhaken" ]
                     ]
                 , div [ Attr.class "preview-dates" ]
-                    (Domain.occurrences 3 event |> List.map (viewOccurrenceButton event))
+                    (Domain.occurrencesFrom previewStart 3 event |> List.map (viewOccurrenceButton event))
                 ]
 
 
@@ -1207,6 +1411,15 @@ button { color: inherit; }
 .filter-pills { display: flex; padding: 3px; background: #e8e9e2; border-radius: 9px; }
 .filter-pill { height: 32px; padding: 0 13px; border: 0; background: transparent; border-radius: 7px; color: #747d77; cursor: pointer; font-size: 10px; font-weight: 750; }
 .filter-pill.is-active { background: var(--surface); color: var(--ink); box-shadow: 0 2px 8px rgba(32,42,35,.08); }
+.date-filter-panel { margin-bottom: 18px; padding: 14px 16px; display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap; background: rgba(255,254,250,.72); border: 1px solid var(--line); border-radius: 12px; }
+.date-filter-heading { min-width: 190px; margin-right: auto; display: flex; align-items: center; gap: 11px; align-self: center; }
+.date-filter-heading > div { display: flex; flex-direction: column; gap: 3px; }.date-filter-icon { width: 30px; height: 30px; display: grid; place-items: center; flex: 0 0 auto; background: var(--green-soft); border-radius: 8px; color: var(--green); }
+.date-filter-title { color: #455149; font-size: 10px; font-weight: 850; letter-spacing: .55px; text-transform: uppercase; }.date-filter-subtitle { color: #8a928c; font-size: 9px; }
+.date-filter-controls { min-width: 0; display: flex; align-items: flex-end; gap: 12px; }.range-fields { min-width: 0; display: flex; align-items: flex-end; gap: 7px; }
+.date-filter-field { min-width: 0; display: flex; flex-direction: column; gap: 5px; color: #68726c; font-size: 8px; font-weight: 850; letter-spacing: .7px; text-transform: uppercase; }.date-filter-field input { width: 132px; min-width: 0; height: 36px; padding: 0 9px; background: white; border: 1px solid #d9ddd5; border-radius: 8px; outline: 0; color: var(--ink); font-size: 11px; }.date-filter-field input:focus { border-color: #6e8f7a; box-shadow: 0 0 0 3px rgba(33,84,61,.09); }.month-field input { width: 142px; }
+.filter-or { align-self: center; color: #a0a7a1; font-size: 8px; font-weight: 850; letter-spacing: 1px; }.apply-range-button { height: 36px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--green); color: white; cursor: pointer; font-size: 10px; font-weight: 800; }
+.active-date-filter { min-height: 30px; padding: 4px 5px 4px 10px; display: flex; align-items: center; gap: 8px; align-self: center; background: var(--lime); border-radius: 20px; color: var(--green); font-size: 9px; font-weight: 800; }.active-date-filter button { width: 22px; height: 22px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 50%; background: rgba(255,255,255,.65); color: var(--green); cursor: pointer; font-size: 15px; line-height: 1; }
+.date-filter-error { flex-basis: 100%; margin-top: -8px; color: #a7433d; font-size: 10px; }
 .event-list { display: grid; gap: 12px; }
 .event-card { display: grid; grid-template-columns: 104px 1fr; min-height: 210px; background: var(--surface); border: 1px solid var(--line); border-radius: 15px; overflow: hidden; transition: border-color .18s, box-shadow .18s, transform .18s; }
 .event-card:hover { border-color: #cbd2c8; box-shadow: 0 10px 35px rgba(35,47,39,.07); transform: translateY(-1px); }
@@ -1302,6 +1515,7 @@ button { color: inherit; }
   .hero-row { grid-template-columns: 1fr; gap: 24px; }.hero-copy { max-width: 600px; }
   .stats-grid { grid-template-columns: 1fr 1fr; }.people-stat { grid-column: 1 / 3; }
   .filterbar { align-items: stretch; flex-direction: column; }.search-wrap { max-width: none; }.filter-groups { justify-content: space-between; }
+  .date-filter-heading { width: 100%; }.date-filter-controls { flex: 1; }.active-date-filter { margin-left: auto; }
 }
 
 @media (max-width: 620px) {
@@ -1309,6 +1523,7 @@ button { color: inherit; }
   .topbar .button { min-height: 39px; padding: 0 13px; }.page { width: calc(100% - 28px); }.hero { padding: 50px 0 36px; }.hero h1 { font-size: 41px; letter-spacing: -1.8px; }
   .stats-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 9px; }.stat-card { min-height: 135px; padding: 18px; }.people-stat { grid-column: 1 / -1; }.stat-number { font-size: 36px; }
   .events-section { margin-top: 52px; }.filter-groups { align-items: flex-start; flex-direction: column; overflow-x: visible; padding-bottom: 3px; }.filter-pills { max-width: 100%; overflow-x: auto; }.recurrence-pills { order: -1; }
+  .date-filter-panel { padding: 13px; align-items: stretch; flex-direction: column; gap: 13px; }.date-filter-heading { width: auto; min-width: 0; margin: 0; }.date-filter-controls { width: 100%; align-items: stretch; flex-direction: column; gap: 9px; }.filter-or { display: none; }.month-field input { width: 100%; }.range-fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; }.date-filter-field input { width: 100%; max-width: 100%; font-size: 16px; }.apply-range-button { grid-column: 1 / -1; }.active-date-filter { margin: 0; align-self: flex-start; }.date-filter-error { margin-top: -4px; }
   .event-card { grid-template-columns: 69px 1fr; }.date-block { padding-top: 31px; }.date-day { font-size: 31px; }.event-main { padding: 20px 17px; }.event-title { font-size: 21px; }.event-head { gap: 8px; }.person-badge { font-size: 0; }
   .preview-dates { grid-template-columns: 1fr; gap: 5px; }.occurrence-button { min-height: 35px; }
   .modal-backdrop { padding: 0; place-items: end center; }.editor-modal { max-height: 94vh; border-radius: 18px 18px 0 0; }.modal-header, .modal-body { padding-left: 19px; padding-right: 19px; }.modal-footer { padding: 14px 19px; }

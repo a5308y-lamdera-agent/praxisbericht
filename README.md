@@ -40,6 +40,11 @@ synchronisiert jede Änderung an alle verbundenen Clients. Die Oberfläche in
 `src/Frontend.elm` bietet Erstellen, Bearbeiten, Löschen, Suche, Filter und eine
 Vorschau wiederkehrender Termine mit einzeln abhakbaren Instanzen.
 
+Die Terminliste kann zusätzlich entweder nach einem ganzen Kalendermonat oder
+nach einem frei gewählten, inklusiven Datumsbereich gefiltert werden. Auch
+monatsübergreifende Termine und berechnete Instanzen einer Semester- oder
+Jahresserie werden berücksichtigt.
+
 ## Prüfen
 
 ```sh

@@ -1,6 +1,7 @@
 module Domain exposing
     ( Assignment(..)
     , CalendarDate(..)
+    , CalendarRange(..)
     , ClockTime(..)
     , Comment(..)
     , Event
@@ -12,9 +13,13 @@ module Domain exposing
     , Person(..)
     , Recurrence(..)
     , TimeWindow(..)
+    , YearMonth(..)
     , assignmentIncludes
     , assignmentLabel
     , calendarDate
+    , calendarRange
+    , calendarRangeFromIso
+    , calendarRangeToGerman
     , commentFromString
     , commentToString
     , dateFromIso
@@ -23,11 +28,14 @@ module Domain exposing
     , draftIsValid
     , eventFromDraft
     , eventIdToInt
+    , eventOverlapsRange
     , eventToDraft
+    , firstOccurrenceOverlapping
     , momentDate
     , momentTime
     , occurrenceWindows
     , occurrences
+    , occurrencesFrom
     , personLabel
     , recurrenceLabel
     , timeFromIso
@@ -38,6 +46,9 @@ module Domain exposing
     , windowEnd
     , windowStart
     , windowToGerman
+    , yearMonthFromIso
+    , yearMonthToGerman
+    , yearMonthToRange
     )
 
 {-| The domain model deliberately uses small custom types instead of a generic
@@ -77,6 +88,20 @@ type CalendarDate
         { year : Int
         , month : Int
         , day : Int
+        }
+
+
+type YearMonth
+    = YearMonth
+        { year : Int
+        , month : Int
+        }
+
+
+type CalendarRange
+    = CalendarRange
+        { start : CalendarDate
+        , end : CalendarDate
         }
 
 
@@ -216,6 +241,70 @@ calendarDate year month day =
 
     else
         Ok (CalendarDate { year = year, month = month, day = day })
+
+
+calendarRange : CalendarDate -> CalendarDate -> Result String CalendarRange
+calendarRange start end =
+    if compareDate start end == GT then
+        Err "Das Ende des Zeitraums muss am oder nach dem Beginn liegen."
+
+    else
+        Ok (CalendarRange { start = start, end = end })
+
+
+calendarRangeFromIso : String -> String -> Result String CalendarRange
+calendarRangeFromIso rawStart rawEnd =
+    dateFromIso rawStart
+        |> Result.andThen
+            (\start ->
+                dateFromIso rawEnd
+                    |> Result.andThen (calendarRange start)
+            )
+
+
+calendarRangeToGerman : CalendarRange -> String
+calendarRangeToGerman (CalendarRange range) =
+    dateToGerman range.start ++ " – " ++ dateToGerman range.end
+
+
+yearMonthFromIso : String -> Result String YearMonth
+yearMonthFromIso value =
+    case String.split "-" value of
+        [ rawYear, rawMonth ] ->
+            case ( String.toInt rawYear, String.toInt rawMonth ) of
+                ( Just year, Just month ) ->
+                    yearMonth year month
+
+                _ ->
+                    Err "Bitte einen vollständigen Monat auswählen."
+
+        _ ->
+            Err "Bitte einen vollständigen Monat auswählen."
+
+
+yearMonth : Int -> Int -> Result String YearMonth
+yearMonth year month =
+    if year < 1900 || year > 2200 then
+        Err "Das Jahr muss zwischen 1900 und 2200 liegen."
+
+    else if month < 1 || month > 12 then
+        Err "Der Monat ist ungültig."
+
+    else
+        Ok (YearMonth { year = year, month = month })
+
+
+yearMonthToRange : YearMonth -> CalendarRange
+yearMonthToRange (YearMonth value) =
+    CalendarRange
+        { start = CalendarDate { year = value.year, month = value.month, day = 1 }
+        , end = CalendarDate { year = value.year, month = value.month, day = daysInMonth value.year value.month }
+        }
+
+
+yearMonthToGerman : YearMonth -> String
+yearMonthToGerman (YearMonth value) =
+    pad2 value.month ++ "." ++ String.fromInt value.year
 
 
 clockTime : Int -> Int -> Result String ClockTime
@@ -396,7 +485,15 @@ occurrenceWindows requestedCount event =
 
 occurrences : Int -> Event -> List Occurrence
 occurrences requestedCount event =
+    occurrencesFrom (OccurrenceIndex 0) requestedCount event
+
+
+occurrencesFrom : OccurrenceIndex -> Int -> Event -> List Occurrence
+occurrencesFrom (OccurrenceIndex requestedStart) requestedCount event =
     let
+        startIndex =
+            max 0 requestedStart
+
         count =
             max 1 requestedCount
 
@@ -413,14 +510,81 @@ occurrences requestedCount event =
     in
     case event.recurrence of
         OneTime ->
-            [ occurrenceFor event 0 event.window ]
+            if startIndex == 0 then
+                [ occurrenceFor event 0 event.window ]
+
+            else
+                []
 
         _ ->
-            List.range 0 (count - 1)
+            List.range startIndex (startIndex + count - 1)
                 |> List.map
                     (\index ->
                         occurrenceFor event index (shiftWindow (index * monthStep) event.window)
                     )
+
+
+eventOverlapsRange : CalendarRange -> Event -> Bool
+eventOverlapsRange range event =
+    firstOccurrenceOverlapping range event /= Nothing
+
+
+firstOccurrenceOverlapping : CalendarRange -> Event -> Maybe Occurrence
+firstOccurrenceOverlapping range event =
+    occurrenceCandidates range event
+        |> List.filter (occurrenceOverlaps range)
+        |> List.head
+
+
+occurrenceCandidates : CalendarRange -> Event -> List Occurrence
+occurrenceCandidates (CalendarRange range) event =
+    let
+        baseStart =
+            event.window |> windowStart |> momentDate
+
+        monthStep =
+            case event.recurrence of
+                OneTime ->
+                    0
+
+                EverySemester ->
+                    6
+
+                EveryYear ->
+                    12
+
+        countThroughRange =
+            if monthStep == 0 then
+                1
+
+            else
+                max 1 (monthsBetween baseStart range.end // monthStep + 2)
+    in
+    if compareDate range.end baseStart == LT then
+        []
+
+    else
+        occurrences countThroughRange event
+
+
+occurrenceOverlaps : CalendarRange -> Occurrence -> Bool
+occurrenceOverlaps (CalendarRange range) occurrence =
+    let
+        occurrenceStart =
+            occurrence.window |> windowStart |> momentDate
+
+        occurrenceEnd =
+            occurrence.window |> windowEnd |> momentDate
+    in
+    compareDate occurrenceStart range.end
+        /= GT
+        && compareDate occurrenceEnd range.start
+        /= LT
+
+
+monthsBetween : CalendarDate -> CalendarDate -> Int
+monthsBetween (CalendarDate start) (CalendarDate end) =
+    (end.year * 12 + end.month) - (start.year * 12 + start.month)
 
 
 occurrenceFor : Event -> Int -> TimeWindow -> Occurrence
@@ -487,6 +651,13 @@ addMonths amount (CalendarDate value) =
 compareMoment : Moment -> Moment -> Order
 compareMoment (Moment left) (Moment right) =
     compare (momentSortValue left) (momentSortValue right)
+
+
+compareDate : CalendarDate -> CalendarDate -> Order
+compareDate (CalendarDate left) (CalendarDate right) =
+    compare
+        ((left.year * 13 + left.month) * 32 + left.day)
+        ((right.year * 13 + right.month) * 32 + right.day)
 
 
 momentSortValue : { date : CalendarDate, time : ClockTime } -> Int
