@@ -398,10 +398,7 @@ view model =
         , div [ Attr.class "app-shell" ]
             [ viewHeader model
             , main_ [ Attr.class "page" ]
-                [ viewHero model
-                , viewStats model
-                , viewEventSection model
-                ]
+                [ viewEventSection model ]
             , viewNotice model.notice
             , viewEditor model
             , viewDeleteDialog model
@@ -418,7 +415,7 @@ viewHeader model =
                 [ span [] [ text "P" ] ]
             , div []
                 [ div [ Attr.class "brand-name" ] [ text "PraxisPlan" ]
-                , div [ Attr.class "brand-subtitle" ] [ text "BERICHT · ORGANISATION" ]
+                , div [ Attr.class "brand-subtitle" ] [ text "TERMINMANAGEMENT" ]
                 ]
             ]
         , div [ Attr.class "topbar-actions" ]
@@ -452,75 +449,6 @@ viewSyncState syncState =
         SyncFailed _ ->
             div [ Attr.class "sync-state sync-error" ]
                 [ span [ Attr.class "sync-dot" ] [], text "Fehler" ]
-
-
-viewHero : Model -> Html FrontendMsg
-viewHero model =
-    div [ Attr.class "hero" ]
-        [ div [ Attr.class "eyebrow" ]
-            [ span [ Attr.class "eyebrow-line" ] []
-            , text "PRAXISBERICHT · TERMINMANAGEMENT"
-            ]
-        , if List.isEmpty model.events then
-            div [ Attr.class "hero-hint" ]
-                [ span [ Attr.class "hint-icon" ] [ text "↗" ]
-                , text "Beginne mit dem ersten relevanten Zeitfenster."
-                ]
-
-          else
-            text ""
-        ]
-
-
-viewStats : Model -> Html FrontendMsg
-viewStats model =
-    let
-        countFor person =
-            List.filter (\event -> Domain.assignmentIncludes person event.assignment) model.events |> List.length
-
-        recurringCount =
-            List.filter (\event -> event.recurrence /= OneTime) model.events |> List.length
-    in
-    div [ Attr.class "stats-grid" ]
-        [ statCard "Termine" (String.fromInt (List.length model.events)) "gesamt geplant" "calendar"
-        , statCard "Wiederkehrend" (String.fromInt recurringCount) "Jährlich" "repeat"
-        , div [ Attr.class "stat-card people-stat" ]
-            [ div [ Attr.class "stat-heading" ] [ text "Zuständigkeit" ]
-            , div [ Attr.class "people-counts" ]
-                [ div []
-                    [ personAvatar PersonA
-                    , span [] [ text (String.fromInt (countFor PersonA)) ]
-                    , smallText "Termine"
-                    ]
-                , div [ Attr.class "people-divider" ] []
-                , div []
-                    [ personAvatar PersonB
-                    , span [] [ text (String.fromInt (countFor PersonB)) ]
-                    , smallText "Termine"
-                    ]
-                ]
-            ]
-        ]
-
-
-statCard : String -> String -> String -> String -> Html msg
-statCard heading number detail iconClass =
-    div [ Attr.class "stat-card" ]
-        [ div [ Attr.class "stat-top" ]
-            [ div [ Attr.class "stat-heading" ] [ text heading ]
-            , div [ Attr.class ("stat-icon " ++ iconClass), Attr.attribute "aria-hidden" "true" ]
-                [ text
-                    (if iconClass == "repeat" then
-                        "↻"
-
-                     else
-                        "□"
-                    )
-                ]
-            ]
-        , div [ Attr.class "stat-number" ] [ text number ]
-        , div [ Attr.class "stat-detail" ] [ text detail ]
-        ]
 
 
 smallText : String -> Html msg
@@ -1405,34 +1333,10 @@ button { color: inherit; }
 .button-danger { background: #a7433d; color: white; }
 .arrow { font-size: 17px; }
 .page { width: min(1180px, calc(100% - 56px)); margin: 0 auto; padding-bottom: 90px; }
-.hero { padding: 82px 0 50px; }
-.eyebrow { display: flex; align-items: center; gap: 12px; color: var(--green); font-size: 10px; font-weight: 850; letter-spacing: 2.2px; }
-.eyebrow-line { width: 34px; height: 2px; background: var(--orange); }
-.hero-row { display: grid; grid-template-columns: 1.5fr .7fr; gap: 80px; align-items: end; margin-top: 22px; }
-.hero h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(42px, 5vw, 66px); line-height: .99; letter-spacing: -2.6px; font-weight: 500; }
-.hero h1 span { color: var(--green); font-style: italic; }
-.hero-copy { margin: 0 0 4px; color: var(--muted); line-height: 1.72; font-size: 15px; max-width: 410px; }
-.hero-hint { margin-top: 34px; display: inline-flex; align-items: center; gap: 12px; color: var(--muted); font-size: 12px; }
-.hint-icon { width: 26px; height: 26px; display: grid; place-items: center; border: 1px solid #bdc5bc; border-radius: 50%; color: var(--green); }
-.stats-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.35fr); gap: 16px; }
-.stat-card { min-width: 0; min-height: 155px; padding: 23px 25px; background: rgba(255,254,250,.86); border: 1px solid var(--line); border-radius: 15px; box-shadow: 0 3px 14px rgba(36,48,39,.035); }
-.stat-top { display: flex; justify-content: space-between; align-items: center; }
-.stat-heading { color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
-.stat-icon { width: 31px; height: 31px; display: grid; place-items: center; border-radius: 8px; background: var(--green-soft); color: var(--green); font-size: 18px; }
-.stat-icon.repeat { background: var(--orange-soft); color: var(--orange); }
-.stat-number { margin-top: 10px; font-family: Georgia, serif; font-size: 43px; line-height: 1; }
-.stat-detail { margin-top: 7px; color: #8a918c; font-size: 11px; }
-.people-counts { height: 91px; display: flex; align-items: center; gap: 26px; }
-.people-counts > div:not(.people-divider) { display: grid; grid-template-columns: 36px auto; grid-template-rows: 22px 17px; column-gap: 12px; align-items: center; }
-.people-counts .avatar { grid-row: 1 / 3; }
-.people-counts span:not(.avatar) { font-family: Georgia, serif; font-size: 23px; }
-.people-counts .small-text { color: #8a918c; font-family: inherit !important; font-size: 10px !important; }
-.people-divider { width: 1px; height: 42px; background: var(--line); }
 .avatar { width: 29px; height: 29px; display: inline-grid; place-items: center; border-radius: 50%; font-size: 11px; font-weight: 850; flex: 0 0 auto; }
 .avatar-a { background: var(--green); color: white; }
 .avatar-b { background: var(--orange-soft); color: #a54f26; }
-.people-counts .avatar { width: 36px; height: 36px; }
-.events-section { margin-top: 72px; }
+.events-section { margin-top: 32px; }
 .section-title-row { display: flex; align-items: end; justify-content: space-between; margin-bottom: 22px; }
 .section-title-row h2, .modal-header h2 { margin: 4px 0 0; font-family: Georgia, serif; font-size: 31px; font-weight: 500; letter-spacing: -.8px; }
 .result-count { color: #8b938d; font-size: 11px; }
@@ -1545,17 +1449,14 @@ button { color: inherit; }
 .delete-actions { display: flex; justify-content: center; gap: 8px; }
 
 @media (max-width: 860px) {
-  .hero-row { grid-template-columns: 1fr; gap: 24px; }.hero-copy { max-width: 600px; }
-  .stats-grid { grid-template-columns: 1fr 1fr; }.people-stat { grid-column: 1 / 3; }
   .filterbar { align-items: stretch; flex-direction: column; }.search-wrap { max-width: none; }.filter-groups { justify-content: space-between; }
   .date-filter-heading { width: 100%; }.date-filter-controls { flex: 1; }
 }
 
 @media (max-width: 620px) {
   .topbar { height: 70px; padding: 0 18px; }.brand-subtitle, .hide-mobile { display: none; }.brand-mark { width: 36px; height: 36px; }.brand-name { font-size: 18px; }
-  .topbar .button { min-height: 39px; padding: 0 13px; }.page { width: calc(100% - 28px); }.hero { padding: 50px 0 36px; }.hero h1 { font-size: 41px; letter-spacing: -1.8px; }
-  .stats-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 9px; }.stat-card { min-height: 135px; padding: 18px; }.people-stat { grid-column: 1 / -1; }.stat-number { font-size: 36px; }
-  .events-section { margin-top: 52px; }.filter-groups { align-items: flex-start; flex-direction: column; overflow-x: visible; padding-bottom: 3px; }.filter-pills { max-width: 100%; overflow-x: auto; }.recurrence-pills { order: -1; }
+  .topbar .button { min-height: 39px; padding: 0 13px; }.page { width: calc(100% - 28px); }
+  .events-section { margin-top: 28px; }.filter-groups { align-items: flex-start; flex-direction: column; overflow-x: visible; padding-bottom: 3px; }.filter-pills { max-width: 100%; overflow-x: auto; }.recurrence-pills { order: -1; }
   .date-filter-panel { padding: 13px; align-items: stretch; flex-direction: column; gap: 13px; }.date-filter-heading { width: auto; min-width: 0; margin: 0; }.date-filter-controls { width: 100%; align-items: stretch; flex-direction: column; gap: 9px; }.filter-or { display: none; }.month-field select { width: 100%; }.range-fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; }.date-filter-field input, .date-filter-field select { width: 100%; max-width: 100%; font-size: 16px; }.apply-range-button { grid-column: 1 / -1; }.date-filter-error { margin-top: -4px; }
   .event-card { grid-template-columns: 69px 1fr; }.date-block { padding-top: 31px; }.date-day { font-size: 31px; }.event-main { padding: 20px 17px; }.event-title { font-size: 21px; }.event-head { gap: 8px; }.person-badge { font-size: 0; }
   .preview-dates { grid-template-columns: 1fr; gap: 5px; }.occurrence-button { min-height: 35px; }
