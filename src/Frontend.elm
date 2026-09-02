@@ -1043,18 +1043,15 @@ viewRecurrencePreview previewStart event =
 viewOccurrenceButton : Event -> Occurrence -> Html FrontendMsg
 viewOccurrenceButton event occurrence =
     let
-        dateLabel =
-            occurrence.window
-                |> Domain.windowStart
-                |> Domain.momentDate
-                |> Domain.dateToGerman
+        slotLabel =
+            Domain.windowToGerman occurrence.window
 
         actionLabel =
             if occurrence.isCompleted then
-                dateLabel ++ " wieder öffnen"
+                slotLabel ++ " wieder öffnen"
 
             else
-                dateLabel ++ " als erledigt markieren"
+                slotLabel ++ " als erledigt markieren"
     in
     button
         [ Attr.class
@@ -1075,7 +1072,7 @@ viewOccurrenceButton event occurrence =
         , onClick (ToggleOccurrence event.id occurrence.index)
         ]
         [ completionCheck occurrence.isCompleted
-        , span [] [ text dateLabel ]
+        , span [ Attr.class "occurrence-slot" ] [ text slotLabel ]
         ]
 
 
@@ -1465,6 +1462,7 @@ button { color: inherit; }
 .preview-dates { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
 .occurrence-button { min-height: 38px; padding: 6px 9px; display: flex; align-items: center; gap: 7px; background: #f0f2ec; border: 1px solid transparent; border-radius: 7px; color: #69736c; cursor: pointer; font-size: 9px; font-weight: 750; }
 .occurrence-button:hover { border-color: #bdc8bf; }.occurrence-button.is-completed { background: #e1eee3; color: var(--green); text-decoration: line-through; }
+.occurrence-slot { min-width: 0; line-height: 1.35; text-align: left; overflow-wrap: anywhere; }
 .occurrence-button .completion-check { width: 16px; height: 16px; background: white; font-size: 8px; }
 .occurrence-button .completion-check.is-checked { background: var(--green); }
 .empty-state { padding: 58px 20px; text-align: center; background: rgba(255,254,250,.7); border: 1px dashed #cbd0c7; border-radius: 15px; }
