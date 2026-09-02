@@ -2,7 +2,7 @@ module Types exposing (..)
 
 import Browser exposing (UrlRequest)
 import Browser.Navigation exposing (Key)
-import Domain exposing (Assignment, CalendarRange, Event, EventDraft, EventId, OccurrenceIndex, Person, Recurrence, YearMonth)
+import Domain exposing (Assignment, CalendarRange, Event, EventDraft, EventId, MonthOfYear, OccurrenceIndex, Person, Recurrence)
 import Url exposing (Url)
 
 
@@ -53,7 +53,7 @@ type RecurrenceFilter
 
 type DateFilter
     = AllDates
-    | InMonth YearMonth
+    | InMonth MonthOfYear
     | InRange CalendarRange
 
 

@@ -21,7 +21,8 @@ verwendet es fachliche Typen:
 - `EventId` für stabile Identitäten
 - `Person` mit den stabilen Varianten `PersonA` (Antonia) und `PersonB` (Theresa)
 - `Assignment` für A, B oder eine gemeinsame Zuständigkeit
-- `Recurrence` mit `OneTime`, `EverySemester` und `EveryYear`
+- `Recurrence` mit `OneTime` und `EveryYear`
+- `MonthOfYear` als geschlossener Typ für die zwölf Kalendermonate
 - `OccurrenceIndex` für den Erledigt-Status einer einzelnen Serieninstanz
 - `CalendarDate`, `ClockTime`, `Moment` und `TimeWindow` für validierte Zeiträume
 - `Comment` für explizit vorhandene oder fehlende Kommentare
@@ -29,7 +30,7 @@ verwendet es fachliche Typen:
 
 Datums-, Uhrzeit- und Zeitfenster-Konstruktoren validieren ihre Eingaben. So
 kann die Oberfläche kein ungültiges Datum und kein Zeitfenster speichern, dessen
-Ende vor seinem Beginn liegt. Semester- und Jahrestermine werden als Regel
+Ende vor seinem Beginn liegt. Jahrestermine werden als Regel
 persistiert; konkrete Folgetermine werden daraus berechnet. Erledigte
 Vorbereitungen werden als Liste von `OccurrenceIndex`-Werten am Event geführt.
 Dadurch kann eine einzelne Instanz abgehakt werden, ohne die ganze Serie zu
@@ -40,9 +41,9 @@ synchronisiert jede Änderung an alle verbundenen Clients. Die Oberfläche in
 `src/Frontend.elm` bietet Erstellen, Bearbeiten, Löschen, Suche, Filter und eine
 Vorschau wiederkehrender Termine mit einzeln abhakbaren Instanzen.
 
-Die Terminliste kann zusätzlich entweder nach einem ganzen Kalendermonat oder
-nach einem frei gewählten, inklusiven Datumsbereich gefiltert werden. Auch
-monatsübergreifende Termine und berechnete Instanzen einer Semester- oder
+Die Terminliste kann zusätzlich entweder nach einem Kalendermonat unabhängig
+vom Jahr oder nach einem frei gewählten, inklusiven Datumsbereich gefiltert
+werden. Auch monatsübergreifende Termine und berechnete Instanzen einer
 Jahresserie werden berücksichtigt.
 
 ## Prüfen

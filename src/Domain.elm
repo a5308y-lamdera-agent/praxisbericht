@@ -8,12 +8,13 @@ module Domain exposing
     , EventDraft
     , EventId(..)
     , Moment(..)
+    , MonthOfYear(..)
     , Occurrence
     , OccurrenceIndex(..)
     , Person(..)
     , Recurrence(..)
     , TimeWindow(..)
-    , YearMonth(..)
+    , allMonths
     , assignmentIncludes
     , assignmentLabel
     , calendarDate
@@ -33,6 +34,9 @@ module Domain exposing
     , firstOccurrenceOverlapping
     , momentDate
     , momentTime
+    , monthOfYearFromString
+    , monthOfYearToGerman
+    , monthOfYearToString
     , occurrenceWindows
     , occurrences
     , occurrencesFrom
@@ -46,9 +50,7 @@ module Domain exposing
     , windowEnd
     , windowStart
     , windowToGerman
-    , yearMonthFromIso
-    , yearMonthToGerman
-    , yearMonthToRange
+    , windowTouchesMonth
     )
 
 {-| The domain model deliberately uses small custom types instead of a generic
@@ -74,7 +76,6 @@ type Assignment
 
 type Recurrence
     = OneTime
-    | EverySemester
     | EveryYear
 
 
@@ -91,11 +92,19 @@ type CalendarDate
         }
 
 
-type YearMonth
-    = YearMonth
-        { year : Int
-        , month : Int
-        }
+type MonthOfYear
+    = January
+    | February
+    | March
+    | April
+    | May
+    | June
+    | July
+    | August
+    | September
+    | October
+    | November
+    | December
 
 
 type CalendarRange
@@ -198,9 +207,6 @@ recurrenceLabel recurrence =
         OneTime ->
             "Einmalig"
 
-        EverySemester ->
-            "Jedes Semester"
-
         EveryYear ->
             "Jährlich"
 
@@ -267,44 +273,96 @@ calendarRangeToGerman (CalendarRange range) =
     dateToGerman range.start ++ " – " ++ dateToGerman range.end
 
 
-yearMonthFromIso : String -> Result String YearMonth
-yearMonthFromIso value =
-    case String.split "-" value of
-        [ rawYear, rawMonth ] ->
-            case ( String.toInt rawYear, String.toInt rawMonth ) of
-                ( Just year, Just month ) ->
-                    yearMonth year month
-
-                _ ->
-                    Err "Bitte einen vollständigen Monat auswählen."
-
-        _ ->
-            Err "Bitte einen vollständigen Monat auswählen."
-
-
-yearMonth : Int -> Int -> Result String YearMonth
-yearMonth year month =
-    if year < 1900 || year > 2200 then
-        Err "Das Jahr muss zwischen 1900 und 2200 liegen."
-
-    else if month < 1 || month > 12 then
-        Err "Der Monat ist ungültig."
-
-    else
-        Ok (YearMonth { year = year, month = month })
+allMonths : List MonthOfYear
+allMonths =
+    [ January
+    , February
+    , March
+    , April
+    , May
+    , June
+    , July
+    , August
+    , September
+    , October
+    , November
+    , December
+    ]
 
 
-yearMonthToRange : YearMonth -> CalendarRange
-yearMonthToRange (YearMonth value) =
-    CalendarRange
-        { start = CalendarDate { year = value.year, month = value.month, day = 1 }
-        , end = CalendarDate { year = value.year, month = value.month, day = daysInMonth value.year value.month }
-        }
+monthOfYearFromString : String -> Result String MonthOfYear
+monthOfYearFromString value =
+    value
+        |> String.toInt
+        |> Maybe.andThen monthOfYearFromNumber
+        |> Result.fromMaybe "Bitte einen Monat auswählen."
 
 
-yearMonthToGerman : YearMonth -> String
-yearMonthToGerman (YearMonth value) =
-    pad2 value.month ++ "." ++ String.fromInt value.year
+monthOfYearToString : MonthOfYear -> String
+monthOfYearToString month =
+    month |> monthOfYearToNumber |> String.fromInt
+
+
+monthOfYearToGerman : MonthOfYear -> String
+monthOfYearToGerman month =
+    case month of
+        January ->
+            "Januar"
+
+        February ->
+            "Februar"
+
+        March ->
+            "März"
+
+        April ->
+            "April"
+
+        May ->
+            "Mai"
+
+        June ->
+            "Juni"
+
+        July ->
+            "Juli"
+
+        August ->
+            "August"
+
+        September ->
+            "September"
+
+        October ->
+            "Oktober"
+
+        November ->
+            "November"
+
+        December ->
+            "Dezember"
+
+
+windowTouchesMonth : MonthOfYear -> TimeWindow -> Bool
+windowTouchesMonth selectedMonth window =
+    let
+        (CalendarDate start) =
+            window |> windowStart |> momentDate
+
+        (CalendarDate end) =
+            window |> windowEnd |> momentDate
+
+        startIndex =
+            start.year * 12 + start.month - 1
+
+        endIndex =
+            end.year * 12 + end.month - 1
+    in
+    List.range startIndex endIndex
+        |> List.any
+            (\monthIndex ->
+                modBy 12 monthIndex + 1 == monthOfYearToNumber selectedMonth
+            )
 
 
 clockTime : Int -> Int -> Result String ClockTime
@@ -502,9 +560,6 @@ occurrencesFrom (OccurrenceIndex requestedStart) requestedCount event =
                 OneTime ->
                     0
 
-                EverySemester ->
-                    6
-
                 EveryYear ->
                     12
     in
@@ -546,9 +601,6 @@ occurrenceCandidates (CalendarRange range) event =
             case event.recurrence of
                 OneTime ->
                     0
-
-                EverySemester ->
-                    6
 
                 EveryYear ->
                     12
@@ -701,6 +753,89 @@ daysInMonth year month =
 isLeapYear : Int -> Bool
 isLeapYear year =
     (modBy 400 year == 0) || (modBy 4 year == 0 && modBy 100 year /= 0)
+
+
+monthOfYearFromNumber : Int -> Maybe MonthOfYear
+monthOfYearFromNumber month =
+    case month of
+        1 ->
+            Just January
+
+        2 ->
+            Just February
+
+        3 ->
+            Just March
+
+        4 ->
+            Just April
+
+        5 ->
+            Just May
+
+        6 ->
+            Just June
+
+        7 ->
+            Just July
+
+        8 ->
+            Just August
+
+        9 ->
+            Just September
+
+        10 ->
+            Just October
+
+        11 ->
+            Just November
+
+        12 ->
+            Just December
+
+        _ ->
+            Nothing
+
+
+monthOfYearToNumber : MonthOfYear -> Int
+monthOfYearToNumber month =
+    case month of
+        January ->
+            1
+
+        February ->
+            2
+
+        March ->
+            3
+
+        April ->
+            4
+
+        May ->
+            5
+
+        June ->
+            6
+
+        July ->
+            7
+
+        August ->
+            8
+
+        September ->
+            9
+
+        October ->
+            10
+
+        November ->
+            11
+
+        December ->
+            12
 
 
 pad2 : Int -> String

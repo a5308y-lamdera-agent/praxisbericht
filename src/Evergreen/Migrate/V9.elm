@@ -35,7 +35,12 @@ frontendModel old =
 
 backendModel : Evergreen.V3.Types.BackendModel -> ModelMigration Evergreen.V9.Types.BackendModel Evergreen.V9.Types.BackendMsg
 backendModel old =
-    ModelUnchanged
+    ModelMigrated
+        ( { events = old.events |> List.map migrate_Domain_Event
+          , nextEventId = old.nextEventId
+          }
+        , Cmd.none
+        )
 
 
 frontendMsg : Evergreen.V3.Types.FrontendMsg -> MsgMigration Evergreen.V9.Types.FrontendMsg Evergreen.V9.Types.FrontendMsg
@@ -45,7 +50,7 @@ frontendMsg old =
 
 toBackend : Evergreen.V3.Types.ToBackend -> MsgMigration Evergreen.V9.Types.ToBackend Evergreen.V9.Types.BackendMsg
 toBackend old =
-    MsgUnchanged
+    MsgMigrated ( migrate_Types_ToBackend old, Cmd.none )
 
 
 backendMsg : Evergreen.V3.Types.BackendMsg -> MsgMigration Evergreen.V9.Types.BackendMsg Evergreen.V9.Types.BackendMsg
@@ -55,7 +60,7 @@ backendMsg old =
 
 toFrontend : Evergreen.V3.Types.ToFrontend -> MsgMigration Evergreen.V9.Types.ToFrontend Evergreen.V9.Types.FrontendMsg
 toFrontend old =
-    MsgUnchanged
+    MsgMigrated ( migrate_Types_ToFrontend old, Cmd.none )
 
 
 migrate_Types_FrontendModel : Evergreen.V3.Types.FrontendModel -> Evergreen.V9.Types.FrontendModel
@@ -123,7 +128,7 @@ migrate_Domain_Event old =
     , recurrence = old.recurrence |> migrate_Domain_Recurrence
     , assignment = old.assignment |> migrate_Domain_Assignment
     , comment = old.comment |> migrate_Domain_Comment
-    , completedOccurrences = old.completedOccurrences |> List.map migrate_Domain_OccurrenceIndex
+    , completedOccurrences = migrateCompletedOccurrences old.recurrence old.completedOccurrences
     }
 
 
@@ -132,6 +137,16 @@ migrate_Domain_EventId old =
     case old of
         Evergreen.V3.Domain.EventId p0 ->
             Evergreen.V9.Domain.EventId p0
+
+
+migrate_Domain_EventDraft : Evergreen.V3.Domain.EventDraft -> Evergreen.V9.Domain.EventDraft
+migrate_Domain_EventDraft old =
+    { title = old.title
+    , window = old.window |> migrate_Domain_TimeWindow
+    , recurrence = old.recurrence |> migrate_Domain_Recurrence
+    , assignment = old.assignment |> migrate_Domain_Assignment
+    , comment = old.comment |> migrate_Domain_Comment
+    }
 
 
 migrate_Domain_Moment : Evergreen.V3.Domain.Moment -> Evergreen.V9.Domain.Moment
@@ -151,6 +166,24 @@ migrate_Domain_OccurrenceIndex old =
             Evergreen.V9.Domain.OccurrenceIndex p0
 
 
+migrateCompletedOccurrences : Evergreen.V3.Domain.Recurrence -> List Evergreen.V3.Domain.OccurrenceIndex -> List Evergreen.V9.Domain.OccurrenceIndex
+migrateCompletedOccurrences recurrence completedOccurrences =
+    case recurrence of
+        Evergreen.V3.Domain.EverySemester ->
+            completedOccurrences
+                |> List.filterMap
+                    (\(Evergreen.V3.Domain.OccurrenceIndex index) ->
+                        if modBy 2 index == 0 then
+                            Just (Evergreen.V9.Domain.OccurrenceIndex (index // 2))
+
+                        else
+                            Nothing
+                    )
+
+        _ ->
+            completedOccurrences |> List.map migrate_Domain_OccurrenceIndex
+
+
 migrate_Domain_Person : Evergreen.V3.Domain.Person -> Evergreen.V9.Domain.Person
 migrate_Domain_Person old =
     case old of
@@ -168,7 +201,7 @@ migrate_Domain_Recurrence old =
             Evergreen.V9.Domain.OneTime
 
         Evergreen.V3.Domain.EverySemester ->
-            Evergreen.V9.Domain.EverySemester
+            Evergreen.V9.Domain.EveryYear
 
         Evergreen.V3.Domain.EveryYear ->
             Evergreen.V9.Domain.EveryYear
@@ -300,6 +333,9 @@ migrate_Types_RecurrenceFilter old =
         Evergreen.V3.Types.AllRecurrences ->
             Evergreen.V9.Types.AllRecurrences
 
+        Evergreen.V3.Types.OnlyRecurrence Evergreen.V3.Domain.EverySemester ->
+            Evergreen.V9.Types.AllRecurrences
+
         Evergreen.V3.Types.OnlyRecurrence p0 ->
             Evergreen.V9.Types.OnlyRecurrence (p0 |> migrate_Domain_Recurrence)
 
@@ -318,3 +354,41 @@ migrate_Types_SyncState old =
 
         Evergreen.V3.Types.SyncFailed p0 ->
             Evergreen.V9.Types.SyncFailed p0
+
+
+migrate_Types_ToBackend : Evergreen.V3.Types.ToBackend -> Evergreen.V9.Types.ToBackend
+migrate_Types_ToBackend old =
+    case old of
+        Evergreen.V3.Types.RequestEvents ->
+            Evergreen.V9.Types.RequestEvents
+
+        Evergreen.V3.Types.CreateEvent p0 ->
+            Evergreen.V9.Types.CreateEvent (p0 |> migrate_Domain_EventDraft)
+
+        Evergreen.V3.Types.UpdateEvent p0 p1 ->
+            Evergreen.V9.Types.UpdateEvent
+                (p0 |> migrate_Domain_EventId)
+                (p1 |> migrate_Domain_EventDraft)
+
+        Evergreen.V3.Types.DeleteEvent p0 ->
+            Evergreen.V9.Types.DeleteEvent (p0 |> migrate_Domain_EventId)
+
+        Evergreen.V3.Types.ToggleOccurrenceCompletion p0 p1 ->
+            Evergreen.V9.Types.ToggleOccurrenceCompletion
+                (p0 |> migrate_Domain_EventId)
+                (p1 |> migrate_Domain_OccurrenceIndex)
+
+
+migrate_Types_ToFrontend : Evergreen.V3.Types.ToFrontend -> Evergreen.V9.Types.ToFrontend
+migrate_Types_ToFrontend old =
+    case old of
+        Evergreen.V3.Types.EventsLoaded p0 ->
+            Evergreen.V9.Types.EventsLoaded (p0 |> List.map migrate_Domain_Event)
+
+        Evergreen.V3.Types.EventsChanged p0 p1 ->
+            Evergreen.V9.Types.EventsChanged
+                (p0 |> List.map migrate_Domain_Event)
+                p1
+
+        Evergreen.V3.Types.ChangeRejected p0 ->
+            Evergreen.V9.Types.ChangeRejected p0

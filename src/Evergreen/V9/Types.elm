@@ -36,7 +36,7 @@ type RecurrenceFilter
 
 type DateFilter
     = AllDates
-    | InMonth Evergreen.V9.Domain.YearMonth
+    | InMonth Evergreen.V9.Domain.MonthOfYear
     | InRange Evergreen.V9.Domain.CalendarRange
 
 

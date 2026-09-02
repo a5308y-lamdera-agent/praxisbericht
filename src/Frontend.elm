@@ -3,7 +3,7 @@ module Frontend exposing (app, init, update, updateFromBackend, view)
 import Browser exposing (UrlRequest(..))
 import Browser.Navigation as Nav
 import Domain exposing (Assignment(..), Comment(..), Event, EventDraft, EventId, Occurrence, Person(..), Recurrence(..))
-import Html exposing (Html, button, div, h1, h2, h3, header, input, label, main_, node, p, span, text, textarea)
+import Html exposing (Html, button, div, h1, h2, h3, header, input, label, main_, node, option, p, select, span, text, textarea)
 import Html.Attributes as Attr
 import Html.Events exposing (onClick, onInput)
 import Lamdera
@@ -180,13 +180,18 @@ update msg model =
                     model.dateFilterForm
 
                 nextForm =
-                    { currentForm | month = value, error = Nothing }
+                    { currentForm
+                        | month = value
+                        , rangeStart = ""
+                        , rangeEnd = ""
+                        , error = Nothing
+                    }
             in
             if String.isEmpty value then
                 ( { model | dateFilter = AllDates, dateFilterForm = nextForm }, Cmd.none )
 
             else
-                case Domain.yearMonthFromIso value of
+                case Domain.monthOfYearFromString value of
                     Ok selectedMonth ->
                         ( { model | dateFilter = InMonth selectedMonth, dateFilterForm = nextForm }, Cmd.none )
 
@@ -216,7 +221,7 @@ update msg model =
                     in
                     ( { model
                         | dateFilter = InRange range
-                        , dateFilterForm = { currentForm | error = Nothing }
+                        , dateFilterForm = { currentForm | month = "", error = Nothing }
                       }
                     , Cmd.none
                     )
@@ -458,7 +463,7 @@ viewStats model =
     in
     div [ Attr.class "stats-grid" ]
         [ statCard "Termine" (String.fromInt (List.length model.events)) "gesamt geplant" "calendar"
-        , statCard "Wiederkehrend" (String.fromInt recurringCount) "Semester & Jahr" "repeat"
+        , statCard "Wiederkehrend" (String.fromInt recurringCount) "Jährlich" "repeat"
         , div [ Attr.class "stat-card people-stat" ]
             [ div [ Attr.class "stat-heading" ] [ text "Zuständigkeit" ]
             , div [ Attr.class "people-counts" ]
@@ -556,7 +561,6 @@ viewFilters model =
             , div [ Attr.class "filter-pills recurrence-pills", Attr.attribute "aria-label" "Nach Wiederholung filtern" ]
                 [ filterButton (model.recurrenceFilter == AllRecurrences) (ChangeRecurrenceFilter AllRecurrences) "Alle Arten"
                 , filterButton (model.recurrenceFilter == OnlyRecurrence OneTime) (ChangeRecurrenceFilter (OnlyRecurrence OneTime)) "Einmalig"
-                , filterButton (model.recurrenceFilter == OnlyRecurrence EverySemester) (ChangeRecurrenceFilter (OnlyRecurrence EverySemester)) "Semester"
                 , filterButton (model.recurrenceFilter == OnlyRecurrence EveryYear) (ChangeRecurrenceFilter (OnlyRecurrence EveryYear)) "Jahr"
                 ]
             ]
@@ -565,6 +569,10 @@ viewFilters model =
 
 viewDateFilter : Model -> Html FrontendMsg
 viewDateFilter model =
+    let
+        months =
+            Domain.allMonths
+    in
     div [ Attr.class "date-filter-panel" ]
         [ div [ Attr.class "date-filter-heading" ]
             [ span [ Attr.class "date-filter-icon", Attr.attribute "aria-hidden" "true" ] [ text "◫" ]
@@ -576,15 +584,17 @@ viewDateFilter model =
         , div [ Attr.class "date-filter-controls" ]
             [ label [ Attr.class "date-filter-field month-field" ]
                 [ span [] [ text "Monat" ]
-                , input
-                    [ Attr.type_ "month"
-                    , Attr.value model.dateFilterForm.month
+                , select
+                    [ Attr.value model.dateFilterForm.month
                     , Attr.attribute "aria-label" "Monat auswählen"
                     , onInput ChangeMonthFilter
                     ]
-                    []
+                    (option [ Attr.value "" ]
+                        [ text "Monat auswählen" ]
+                        :: List.map viewMonthOption months
+                    )
                 ]
-            , span [ Attr.class "filter-or" ] [ text "ODER" ]
+            , span [ Attr.class "filter-or" ] [ span [] [ text "ODER" ] ]
             , div [ Attr.class "range-fields" ]
                 [ label [ Attr.class "date-filter-field" ]
                     [ span [] [ text "Von" ]
@@ -632,6 +642,12 @@ viewDateFilter model =
         ]
 
 
+viewMonthOption : Domain.MonthOfYear -> Html FrontendMsg
+viewMonthOption month =
+    option [ Attr.value (Domain.monthOfYearToString month) ]
+        [ text (Domain.monthOfYearToGerman month) ]
+
+
 dateFilterLabel : DateFilter -> String
 dateFilterLabel filter =
     case filter of
@@ -639,7 +655,7 @@ dateFilterLabel filter =
             "Alle Zeiträume"
 
         InMonth selectedMonth ->
-            "Monat: " ++ Domain.yearMonthToGerman selectedMonth
+            "Monat: " ++ Domain.monthOfYearToGerman selectedMonth
 
         InRange range ->
             "Zeitraum: " ++ Domain.calendarRangeToGerman range
@@ -692,25 +708,15 @@ matchesRecurrence filter event =
 
 matchesDateFilter : DateFilter -> Event -> Bool
 matchesDateFilter filter event =
-    case dateFilterRange filter of
-        Nothing ->
-            True
-
-        Just range ->
-            Domain.eventOverlapsRange range event
-
-
-dateFilterRange : DateFilter -> Maybe Domain.CalendarRange
-dateFilterRange filter =
     case filter of
         AllDates ->
-            Nothing
+            True
 
         InMonth selectedMonth ->
-            Just (Domain.yearMonthToRange selectedMonth)
+            Domain.windowTouchesMonth selectedMonth event.window
 
         InRange range ->
-            Just range
+            Domain.eventOverlapsRange range event
 
 
 matchesSearch : String -> Event -> Bool
@@ -856,11 +862,14 @@ viewEventCard filter event =
 
 occurrenceForFilter : DateFilter -> Event -> Maybe Occurrence
 occurrenceForFilter filter event =
-    case dateFilterRange filter of
-        Nothing ->
+    case filter of
+        AllDates ->
             Domain.occurrences 1 event |> List.head
 
-        Just range ->
+        InMonth _ ->
+            Domain.occurrences 1 event |> List.head
+
+        InRange range ->
             Domain.firstOccurrenceOverlapping range event
 
 
@@ -871,9 +880,6 @@ recurrenceBadge recurrence =
             (case recurrence of
                 OneTime ->
                     "badge badge-once"
-
-                EverySemester ->
-                    "badge badge-semester"
 
                 EveryYear ->
                     "badge badge-year"
@@ -1183,9 +1189,8 @@ editorDialog heading submitLabel model =
                     ]
                 , div [ Attr.class "field" ]
                     [ label [] [ text "Wiederholung" ]
-                    , div [ Attr.class "choice-grid choice-grid-three" ]
+                    , div [ Attr.class "choice-grid" ]
                         [ choiceButton (model.form.recurrence == OneTime) (ChangeRecurrence OneTime) "Einmalig" "Nur dieses Zeitfenster"
-                        , choiceButton (model.form.recurrence == EverySemester) (ChangeRecurrence EverySemester) "Semester" "Alle sechs Monate"
                         , choiceButton (model.form.recurrence == EveryYear) (ChangeRecurrence EveryYear) "Jährlich" "Alle zwölf Monate"
                         ]
                     ]
@@ -1413,8 +1418,8 @@ button { color: inherit; }
 .date-filter-heading > div { display: flex; flex-direction: column; gap: 3px; }.date-filter-icon { width: 30px; height: 30px; display: grid; place-items: center; flex: 0 0 auto; background: var(--green-soft); border-radius: 8px; color: var(--green); }
 .date-filter-title { color: #455149; font-size: 10px; font-weight: 850; letter-spacing: .55px; text-transform: uppercase; }.date-filter-subtitle { color: #8a928c; font-size: 9px; }
 .date-filter-controls { min-width: 0; display: flex; align-items: flex-end; gap: 12px; }.range-fields { min-width: 0; display: flex; align-items: flex-end; gap: 7px; }
-.date-filter-field { min-width: 0; display: flex; flex-direction: column; gap: 5px; color: #68726c; font-size: 8px; font-weight: 850; letter-spacing: .7px; text-transform: uppercase; }.date-filter-field input { width: 132px; min-width: 0; height: 36px; padding: 0 9px; background: white; border: 1px solid #d9ddd5; border-radius: 8px; outline: 0; color: var(--ink); font-size: 11px; }.date-filter-field input:focus { border-color: #6e8f7a; box-shadow: 0 0 0 3px rgba(33,84,61,.09); }.month-field input { width: 142px; }
-.filter-or { align-self: center; color: #a0a7a1; font-size: 8px; font-weight: 850; letter-spacing: 1px; }.apply-range-button { height: 36px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--green); color: white; cursor: pointer; font-size: 10px; font-weight: 800; }
+.date-filter-field { min-width: 0; display: flex; flex-direction: column; gap: 5px; color: #68726c; font-size: 8px; font-weight: 850; letter-spacing: .7px; text-transform: uppercase; }.date-filter-field input, .date-filter-field select { width: 132px; min-width: 0; height: 36px; padding: 0 9px; background: white; border: 1px solid #d9ddd5; border-radius: 8px; outline: 0; color: var(--ink); font-size: 11px; }.date-filter-field input:focus, .date-filter-field select:focus { border-color: #6e8f7a; box-shadow: 0 0 0 3px rgba(33,84,61,.09); }.month-field select { width: 166px; }
+.filter-or { width: 36px; height: 36px; display: grid; place-items: center; flex: 0 0 36px; align-self: flex-end; color: #a0a7a1; font-size: 8px; font-weight: 850; letter-spacing: 1px; }.apply-range-button { height: 36px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--green); color: white; cursor: pointer; font-size: 10px; font-weight: 800; }
 .active-date-filter { min-height: 30px; padding: 4px 5px 4px 10px; display: flex; align-items: center; gap: 8px; align-self: center; background: var(--lime); border-radius: 20px; color: var(--green); font-size: 9px; font-weight: 800; }.active-date-filter button { width: 22px; height: 22px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 50%; background: rgba(255,255,255,.65); color: var(--green); cursor: pointer; font-size: 15px; line-height: 1; }
 .date-filter-error { flex-basis: 100%; margin-top: -8px; color: #a7433d; font-size: 10px; }
 .event-list { display: grid; gap: 12px; }
@@ -1429,7 +1434,6 @@ button { color: inherit; }
 .event-badges { display: flex; align-items: center; gap: 8px; }
 .badge { min-height: 23px; padding: 0 9px; display: inline-flex; align-items: center; gap: 5px; border-radius: 20px; font-size: 9px; font-weight: 850; letter-spacing: .45px; text-transform: uppercase; }
 .badge-once { background: #ebede8; color: #667169; }
-.badge-semester { background: var(--orange-soft); color: #a0522c; }
 .badge-year { background: var(--violet-soft); color: var(--violet); }
 .badge-repeat { font-size: 13px; }
 .person-badge { display: inline-flex; align-items: center; gap: 6px; color: #69726c; font-size: 10px; font-weight: 750; }
@@ -1492,7 +1496,6 @@ button { color: inherit; }
 .datetime-inputs { min-width: 0; display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, .8fr); gap: 7px; }
 .datetime-inputs input { min-width: 0; max-width: 100%; }
 .choice-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-.choice-grid-three { grid-template-columns: repeat(3, 1fr); }
 .assignment-grid { grid-template-columns: repeat(3, 1fr); }
 .choice-card { min-height: 58px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; text-align: left; background: white; border: 1px solid #daddd6; border-radius: 9px; cursor: pointer; }
 .choice-card:hover { border-color: #9ca99e; }.choice-card.is-selected { background: #f1f6f2; border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
@@ -1521,11 +1524,11 @@ button { color: inherit; }
   .topbar .button { min-height: 39px; padding: 0 13px; }.page { width: calc(100% - 28px); }.hero { padding: 50px 0 36px; }.hero h1 { font-size: 41px; letter-spacing: -1.8px; }
   .stats-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 9px; }.stat-card { min-height: 135px; padding: 18px; }.people-stat { grid-column: 1 / -1; }.stat-number { font-size: 36px; }
   .events-section { margin-top: 52px; }.filter-groups { align-items: flex-start; flex-direction: column; overflow-x: visible; padding-bottom: 3px; }.filter-pills { max-width: 100%; overflow-x: auto; }.recurrence-pills { order: -1; }
-  .date-filter-panel { padding: 13px; align-items: stretch; flex-direction: column; gap: 13px; }.date-filter-heading { width: auto; min-width: 0; margin: 0; }.date-filter-controls { width: 100%; align-items: stretch; flex-direction: column; gap: 9px; }.filter-or { display: none; }.month-field input { width: 100%; }.range-fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; }.date-filter-field input { width: 100%; max-width: 100%; font-size: 16px; }.apply-range-button { grid-column: 1 / -1; }.active-date-filter { margin: 0; align-self: flex-start; }.date-filter-error { margin-top: -4px; }
+  .date-filter-panel { padding: 13px; align-items: stretch; flex-direction: column; gap: 13px; }.date-filter-heading { width: auto; min-width: 0; margin: 0; }.date-filter-controls { width: 100%; align-items: stretch; flex-direction: column; gap: 9px; }.filter-or { display: none; }.month-field select { width: 100%; }.range-fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; }.date-filter-field input, .date-filter-field select { width: 100%; max-width: 100%; font-size: 16px; }.apply-range-button { grid-column: 1 / -1; }.active-date-filter { margin: 0; align-self: flex-start; }.date-filter-error { margin-top: -4px; }
   .event-card { grid-template-columns: 69px 1fr; }.date-block { padding-top: 31px; }.date-day { font-size: 31px; }.event-main { padding: 20px 17px; }.event-title { font-size: 21px; }.event-head { gap: 8px; }.person-badge { font-size: 0; }
   .preview-dates { grid-template-columns: 1fr; gap: 5px; }.occurrence-button { min-height: 35px; }
   .modal-backdrop { padding: 0; place-items: end center; }.editor-modal { max-height: 94vh; border-radius: 18px 18px 0 0; }.modal-header, .modal-body { padding-left: 19px; padding-right: 19px; }.modal-footer { padding: 14px 19px; }
-  .field input, .field textarea { font-size: 16px; }.form-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }.datetime-inputs { grid-template-columns: minmax(0, 1fr) 102px; gap: 10px; }.datetime-inputs input[type="date"] { width: calc(100% - 28px); justify-self: start; }.datetime-inputs input[type="time"] { width: 96px; justify-self: end; }.choice-grid-three, .assignment-grid { grid-template-columns: 1fr; }.choice-grid-three .choice-card, .assignment-grid .choice-card { min-height: 49px; }
+  .field input, .field textarea { font-size: 16px; }.form-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }.datetime-inputs { grid-template-columns: minmax(0, 1fr) 102px; gap: 10px; }.datetime-inputs input[type="date"] { width: calc(100% - 28px); justify-self: start; }.datetime-inputs input[type="time"] { width: 96px; justify-self: end; }.assignment-grid { grid-template-columns: 1fr; }.assignment-grid .choice-card { min-height: 49px; }
   .toast { left: 14px; right: 14px; top: 82px; min-width: 0; }.delete-dialog { margin: auto 14px; }
 }
 """

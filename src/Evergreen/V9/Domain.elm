@@ -36,7 +36,6 @@ type TimeWindow
 
 type Recurrence
     = OneTime
-    | EverySemester
     | EveryYear
 
 
@@ -70,11 +69,19 @@ type alias Event =
     }
 
 
-type YearMonth
-    = YearMonth
-        { year : Int
-        , month : Int
-        }
+type MonthOfYear
+    = January
+    | February
+    | March
+    | April
+    | May
+    | June
+    | July
+    | August
+    | September
+    | October
+    | November
+    | December
 
 
 type CalendarRange
