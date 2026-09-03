@@ -2,6 +2,7 @@ module Frontend exposing (app, init, update, updateFromBackend, view)
 
 import Browser exposing (UrlRequest(..))
 import Browser.Navigation as Nav
+import Char
 import Domain exposing (Assignment(..), Comment(..), Event, EventDraft, EventId, Occurrence, Person(..), Recurrence(..))
 import Html exposing (Html, button, div, h1, h2, h3, header, input, label, main_, node, option, p, select, span, text, textarea)
 import Html.Attributes as Attr
@@ -565,16 +566,37 @@ availableTags model =
 
 tagFilterButton : TagFilter -> Domain.Tag -> Html FrontendMsg
 tagFilterButton selectedFilter tag =
-    filterButton
-        (case selectedFilter of
-            AllTags ->
-                False
+    let
+        isActive =
+            case selectedFilter of
+                AllTags ->
+                    False
 
-            TaggedWith selectedTag ->
-                Domain.tagEquals selectedTag tag
-        )
-        (ChangeTagFilter (TaggedWith tag))
-        (Domain.tagToString tag)
+                TaggedWith selectedTag ->
+                    Domain.tagEquals selectedTag tag
+    in
+    button
+        [ Attr.classList
+            [ ( "filter-pill tag-filter-pill " ++ tagColorClass tag, True )
+            , ( "is-active", isActive )
+            ]
+        , onClick (ChangeTagFilter (TaggedWith tag))
+        ]
+        [ text (Domain.tagToString tag) ]
+
+
+tagColorClass : Domain.Tag -> String
+tagColorClass tag =
+    let
+        colorIndex =
+            tag
+                |> Domain.tagToString
+                |> String.toLower
+                |> String.toList
+                |> List.foldl (\character total -> total + Char.toCode character) 0
+                |> modBy 6
+    in
+    "tag-color-" ++ String.fromInt colorIndex
 
 
 viewDateFilter : Model -> Html FrontendMsg
@@ -908,7 +930,7 @@ viewEventTags tags =
         div [ Attr.class "event-tags" ]
             (List.map
                 (\tag ->
-                    span [ Attr.class "event-tag" ]
+                    span [ Attr.class ("event-tag " ++ tagColorClass tag) ]
                         [ text (Domain.tagToString tag) ]
                 )
                 tags
@@ -1458,7 +1480,7 @@ button { color: inherit; }
 .filter-pills { display: flex; padding: 3px; background: #e8e9e2; border-radius: 9px; }
 .filter-pill { height: 32px; padding: 0 13px; border: 0; background: transparent; border-radius: 7px; color: #747d77; cursor: pointer; font-size: 10px; font-weight: 750; }
 .filter-pill.is-active { background: var(--surface); color: var(--ink); box-shadow: 0 2px 8px rgba(32,42,35,.08); }
-.tag-filter-row { margin: -5px 0 17px; display: flex; align-items: center; gap: 9px; min-width: 0; }.tag-filter-label { color: #7a837d; font-size: 9px; font-weight: 850; letter-spacing: .8px; text-transform: uppercase; }.tag-filter-pills { min-width: 0; max-width: 100%; overflow-x: auto; }.tag-filter-pills .filter-pill { flex: 0 0 auto; white-space: nowrap; }
+.tag-filter-row { margin: -5px 0 17px; display: flex; align-items: center; gap: 9px; min-width: 0; }.tag-filter-label { color: #7a837d; font-size: 9px; font-weight: 850; letter-spacing: .8px; text-transform: uppercase; }.tag-filter-pills { min-width: 0; max-width: 100%; overflow-x: auto; }.tag-filter-pills .filter-pill { flex: 0 0 auto; white-space: nowrap; }.tag-filter-pill { color: var(--tag-ink); }.tag-filter-pill.is-active { background: var(--tag-bg); color: var(--tag-ink); box-shadow: inset 0 0 0 1px var(--tag-border), 0 2px 8px rgba(32,42,35,.08); }
 .date-filter-panel { margin-bottom: 18px; padding: 14px 16px; display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap; background: rgba(255,254,250,.72); border: 1px solid var(--line); border-radius: 12px; }
 .date-filter-heading { min-width: 190px; margin-right: auto; display: flex; align-items: center; gap: 11px; align-self: center; }
 .date-filter-heading > div { display: flex; flex-direction: column; gap: 3px; }.date-filter-icon { width: 30px; height: 30px; display: grid; place-items: center; flex: 0 0 auto; background: var(--green-soft); border-radius: 8px; color: var(--green); }
@@ -1495,7 +1517,13 @@ button { color: inherit; }
 .icon-button.danger:hover { color: #a7433d; background: #faeeee; border-color: #ecd0ce; }
 .event-time { display: flex; align-items: center; gap: 7px; color: #667069; font-size: 12px; }
 .time-icon { color: var(--green); font-size: 17px; }
-.event-tags { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 5px; }.event-tag { padding: 4px 8px; background: var(--green-soft); border-radius: 12px; color: var(--green); font-size: 9px; font-weight: 750; }
+.event-tags { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 5px; }.event-tag { padding: 4px 8px; background: var(--tag-bg); border: 1px solid var(--tag-border); border-radius: 12px; color: var(--tag-ink); font-size: 9px; font-weight: 750; }
+.tag-color-0 { --tag-bg: #e3eee6; --tag-border: #c8ddce; --tag-ink: #21543d; }
+.tag-color-1 { --tag-bg: #f5e6dc; --tag-border: #ead0bf; --tag-ink: #9a4b25; }
+.tag-color-2 { --tag-bg: #e9e4f0; --tag-border: #d8cde6; --tag-ink: #655483; }
+.tag-color-3 { --tag-bg: #e1edf2; --tag-border: #c4dce5; --tag-ink: #326276; }
+.tag-color-4 { --tag-bg: #f3e8ec; --tag-border: #e5ced7; --tag-ink: #8a4960; }
+.tag-color-5 { --tag-bg: #f1edda; --tag-border: #e1d9b8; --tag-ink: #746327; }
 .comment-box { margin-top: 18px; padding: 13px 15px; display: flex; gap: 12px; background: #f5f5ef; border-left: 2px solid #aac166; border-radius: 0 8px 8px 0; }
 .comment-mark { width: 20px; height: 20px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 50%; background: var(--lime); color: var(--green); font-size: 10px; font-weight: 900; }
 .comment-label, .preview-label { display: block; color: #879087; font-size: 8px; font-weight: 900; letter-spacing: 1.2px; }
