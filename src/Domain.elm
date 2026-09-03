@@ -13,6 +13,7 @@ module Domain exposing
     , OccurrenceIndex(..)
     , Person(..)
     , Recurrence(..)
+    , Tag(..)
     , TimeWindow(..)
     , allMonths
     , assignmentIncludes
@@ -28,6 +29,7 @@ module Domain exposing
     , dateToIso
     , draftIsValid
     , eventFromDraft
+    , eventHasTag
     , eventIdToInt
     , eventOverlapsRange
     , eventToDraft
@@ -42,10 +44,15 @@ module Domain exposing
     , occurrencesFrom
     , personLabel
     , recurrenceLabel
+    , tagEquals
+    , tagToString
+    , tagsFromString
+    , tagsToString
     , timeFromIso
     , timeToIso
     , timeWindow
     , toggleOccurrenceCompletion
+    , uniqueTags
     , updateEventFromDraft
     , windowEnd
     , windowStart
@@ -82,6 +89,10 @@ type Recurrence
 type Comment
     = NoComment
     | Comment String
+
+
+type Tag
+    = Tag String
 
 
 type CalendarDate
@@ -151,6 +162,7 @@ type alias EventDraft =
     , window : TimeWindow
     , recurrence : Recurrence
     , assignment : Assignment
+    , tags : List Tag
     , comment : Comment
     }
 
@@ -161,6 +173,7 @@ type alias Event =
     , window : TimeWindow
     , recurrence : Recurrence
     , assignment : Assignment
+    , tags : List Tag
     , comment : Comment
     , completedOccurrences : List OccurrenceIndex
     }
@@ -209,6 +222,71 @@ recurrenceLabel recurrence =
 
         EveryYear ->
             "Jährlich"
+
+
+tagToString : Tag -> String
+tagToString (Tag value) =
+    value
+
+
+tagEquals : Tag -> Tag -> Bool
+tagEquals first second =
+    tagKey first == tagKey second
+
+
+tagsFromString : String -> List Tag
+tagsFromString value =
+    value
+        |> String.split ","
+        |> List.filterMap tagFromString
+        |> uniqueTags
+
+
+tagsToString : List Tag -> String
+tagsToString tags =
+    tags
+        |> List.map tagToString
+        |> String.join ", "
+
+
+uniqueTags : List Tag -> List Tag
+uniqueTags tags =
+    List.foldl
+        (\tag unique ->
+            if List.any (tagEquals tag) unique then
+                unique
+
+            else
+                tag :: unique
+        )
+        []
+        tags
+        |> List.reverse
+
+
+eventHasTag : Tag -> Event -> Bool
+eventHasTag selectedTag event =
+    List.any (tagEquals selectedTag) event.tags
+
+
+tagFromString : String -> Maybe Tag
+tagFromString value =
+    let
+        cleaned =
+            String.trim value
+    in
+    if String.isEmpty cleaned then
+        Nothing
+
+    else
+        Just (Tag cleaned)
+
+
+tagKey : Tag -> String
+tagKey (Tag value) =
+    value
+        |> String.trim
+        |> String.toLower
 
 
 commentFromString : String -> Comment
@@ -504,6 +582,7 @@ eventFromDraft id draft =
     , window = draft.window
     , recurrence = draft.recurrence
     , assignment = draft.assignment
+    , tags = uniqueTags draft.tags
     , comment = draft.comment
     , completedOccurrences = []
     }
@@ -516,6 +595,7 @@ updateEventFromDraft draft event =
         , window = draft.window
         , recurrence = draft.recurrence
         , assignment = draft.assignment
+        , tags = uniqueTags draft.tags
         , comment = draft.comment
     }
 
@@ -526,6 +606,7 @@ eventToDraft event =
     , window = event.window
     , recurrence = event.recurrence
     , assignment = event.assignment
+    , tags = event.tags
     , comment = event.comment
     }
 

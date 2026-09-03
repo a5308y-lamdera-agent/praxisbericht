@@ -2,7 +2,7 @@ module Types exposing (..)
 
 import Browser exposing (UrlRequest)
 import Browser.Navigation exposing (Key)
-import Domain exposing (Assignment, CalendarRange, Event, EventDraft, EventId, MonthOfYear, OccurrenceIndex, Person, Recurrence)
+import Domain exposing (Assignment, CalendarRange, Event, EventDraft, EventId, MonthOfYear, OccurrenceIndex, Person, Recurrence, Tag)
 import Url exposing (Url)
 
 
@@ -13,6 +13,7 @@ type alias FrontendModel =
     , editor : EditorState
     , personFilter : PersonFilter
     , recurrenceFilter : RecurrenceFilter
+    , tagFilter : TagFilter
     , dateFilter : DateFilter
     , dateFilterForm : DateFilterForm
     , search : String
@@ -31,6 +32,7 @@ type alias EventForm =
     , endTime : String
     , recurrence : Recurrence
     , assignment : Assignment
+    , tags : String
     , comment : String
     }
 
@@ -50,6 +52,11 @@ type PersonFilter
 type RecurrenceFilter
     = AllRecurrences
     | OnlyRecurrence Recurrence
+
+
+type TagFilter
+    = AllTags
+    | TaggedWith Tag
 
 
 type DateFilter
@@ -93,10 +100,12 @@ type FrontendMsg
     | ChangeEndTime String
     | ChangeRecurrence Recurrence
     | ChangeAssignment Assignment
+    | ChangeTags String
     | ChangeComment String
     | SubmitEvent
     | ChangePersonFilter PersonFilter
     | ChangeRecurrenceFilter RecurrenceFilter
+    | ChangeTagFilter TagFilter
     | ChangeMonthFilter String
     | ChangeRangeStart String
     | ChangeRangeEnd String

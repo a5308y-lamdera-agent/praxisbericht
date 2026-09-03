@@ -2,8 +2,9 @@
 
 PraxisPlan ist eine kleine Lamdera-Anwendung zur gemeinsamen Terminplanung für
 einen Praxisbericht. Ereignisse besitzen ein konkretes Zeitfenster, können
-einmalig, semesterweise oder jährlich stattfinden und sind eindeutig Antonia,
-Theresa oder beiden Personen gemeinsam zugeordnet.
+einmalig oder jährlich stattfinden und sind eindeutig Antonia, Theresa oder
+beiden Personen gemeinsam zugeordnet. Frei vergebbare Tags ordnen Termine
+zusätzlich nach Themen.
 
 ## Lokal starten
 
@@ -26,6 +27,7 @@ verwendet es fachliche Typen:
 - `OccurrenceIndex` für den Erledigt-Status einer einzelnen Serieninstanz
 - `CalendarDate`, `ClockTime`, `Moment` und `TimeWindow` für validierte Zeiträume
 - `Comment` für explizit vorhandene oder fehlende Kommentare
+- `Tag` und `List Tag` für normalisierte, mehrfach vergebbare Schlagwörter
 - `EventDraft` für noch nicht persistierte und `Event` für gespeicherte Termine
 
 Datums-, Uhrzeit- und Zeitfenster-Konstruktoren validieren ihre Eingaben. So
@@ -41,7 +43,9 @@ synchronisiert jede Änderung an alle verbundenen Clients. Die Oberfläche in
 `src/Frontend.elm` bietet Erstellen, Kopieren, Bearbeiten, Löschen, Suche,
 Filter und eine Vorschau wiederkehrender Termine mit einzeln abhakbaren
 Instanzen. Beim Kopieren werden die Termindetails in einen neuen Entwurf
-übernommen; Erledigt-Zustände bleiben bewusst beim Original.
+übernommen; Erledigt-Zustände bleiben bewusst beim Original. Tags werden im
+Editor kommasepariert gepflegt, auf den Terminkarten angezeigt und stehen als
+Filter zur Verfügung.
 
 Die Terminliste kann zusätzlich entweder nach einem Kalendermonat unabhängig
 vom Jahr oder nach einem frei gewählten, inklusiven Datumsbereich gefiltert

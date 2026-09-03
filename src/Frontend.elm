@@ -36,6 +36,7 @@ init _ key =
       , editor = EditorClosed
       , personFilter = AllPeople
       , recurrenceFilter = AllRecurrences
+      , tagFilter = AllTags
       , dateFilter = AllDates
       , dateFilterForm = emptyDateFilterForm
       , search = ""
@@ -57,6 +58,7 @@ emptyForm =
     , endTime = "10:00"
     , recurrence = OneTime
     , assignment = OnlyPerson PersonA
+    , tags = ""
     , comment = ""
     }
 
@@ -160,6 +162,9 @@ update msg model =
         ChangeAssignment value ->
             ( updateForm (\form -> { form | assignment = value }) model, Cmd.none )
 
+        ChangeTags value ->
+            ( updateForm (\form -> { form | tags = value }) model, Cmd.none )
+
         ChangeComment value ->
             ( updateForm (\form -> { form | comment = value }) model, Cmd.none )
 
@@ -193,6 +198,9 @@ update msg model =
 
         ChangeRecurrenceFilter value ->
             ( { model | recurrenceFilter = value }, Cmd.none )
+
+        ChangeTagFilter value ->
+            ( { model | tagFilter = value }, Cmd.none )
 
         ChangeMonthFilter value ->
             let
@@ -263,6 +271,7 @@ update msg model =
             ( { model
                 | personFilter = AllPeople
                 , recurrenceFilter = AllRecurrences
+                , tagFilter = AllTags
                 , dateFilter = AllDates
                 , dateFilterForm = emptyDateFilterForm
                 , search = ""
@@ -350,6 +359,7 @@ formToDraft form =
                                                                     , window = window
                                                                     , recurrence = form.recurrence
                                                                     , assignment = form.assignment
+                                                                    , tags = Domain.tagsFromString form.tags
                                                                     , comment = Domain.commentFromString form.comment
                                                                     }
                                                                 )
@@ -380,6 +390,7 @@ formFromEvent event =
     , endTime = Domain.timeToIso (Domain.momentTime end)
     , recurrence = event.recurrence
     , assignment = event.assignment
+    , tags = Domain.tagsToString event.tags
     , comment = Domain.commentToString event.comment
     }
 
@@ -472,6 +483,7 @@ viewEventSection model =
                 [ text (String.fromInt (List.length events) ++ " angezeigt") ]
             ]
         , viewFilters model
+        , viewTagFilters model
         , viewDateFilter model
         , case model.syncState of
             Loading ->
@@ -513,6 +525,56 @@ viewFilters model =
                 ]
             ]
         ]
+
+
+viewTagFilters : Model -> Html FrontendMsg
+viewTagFilters model =
+    let
+        tags =
+            availableTags model
+    in
+    if List.isEmpty tags then
+        text ""
+
+    else
+        div [ Attr.class "tag-filter-row" ]
+            [ span [ Attr.class "tag-filter-label" ] [ text "Tags" ]
+            , div [ Attr.class "filter-pills tag-filter-pills", Attr.attribute "aria-label" "Nach Tag filtern" ]
+                (filterButton (model.tagFilter == AllTags) (ChangeTagFilter AllTags) "Alle Tags"
+                    :: List.map (tagFilterButton model.tagFilter) tags
+                )
+            ]
+
+
+availableTags : Model -> List Domain.Tag
+availableTags model =
+    let
+        selectedTags =
+            case model.tagFilter of
+                AllTags ->
+                    []
+
+                TaggedWith tag ->
+                    [ tag ]
+    in
+    selectedTags
+        ++ List.concatMap .tags model.events
+        |> Domain.uniqueTags
+        |> List.sortBy (Domain.tagToString >> String.toLower)
+
+
+tagFilterButton : TagFilter -> Domain.Tag -> Html FrontendMsg
+tagFilterButton selectedFilter tag =
+    filterButton
+        (case selectedFilter of
+            AllTags ->
+                False
+
+            TaggedWith selectedTag ->
+                Domain.tagEquals selectedTag tag
+        )
+        (ChangeTagFilter (TaggedWith tag))
+        (Domain.tagToString tag)
 
 
 viewDateFilter : Model -> Html FrontendMsg
@@ -631,6 +693,7 @@ visibleEvents model =
     model.events
         |> List.filter (matchesPerson model.personFilter)
         |> List.filter (matchesRecurrence model.recurrenceFilter)
+        |> List.filter (matchesTag model.tagFilter)
         |> List.filter (matchesDateFilter model.dateFilter)
         |> List.filter (matchesSearch model.search)
         |> List.sortBy (eventSortKey model.dateFilter)
@@ -656,6 +719,16 @@ matchesRecurrence filter event =
             event.recurrence == recurrence
 
 
+matchesTag : TagFilter -> Event -> Bool
+matchesTag filter event =
+    case filter of
+        AllTags ->
+            True
+
+        TaggedWith tag ->
+            Domain.eventHasTag tag event
+
+
 matchesDateFilter : DateFilter -> Event -> Bool
 matchesDateFilter filter event =
     case filter of
@@ -676,7 +749,13 @@ matchesSearch search event =
             String.toLower (String.trim search)
 
         haystack =
-            String.toLower (event.title ++ " " ++ Domain.commentToString event.comment)
+            String.toLower
+                (event.title
+                    ++ " "
+                    ++ Domain.commentToString event.comment
+                    ++ " "
+                    ++ Domain.tagsToString event.tags
+                )
     in
     String.isEmpty needle || String.contains needle haystack
 
@@ -710,6 +789,8 @@ viewEmptyState model =
                 /= AllPeople
                 || model.recurrenceFilter
                 /= AllRecurrences
+                || model.tagFilter
+                /= AllTags
                 || model.dateFilter
                 /= AllDates
     in
@@ -810,11 +891,28 @@ viewEventCard filter event =
                 [ span [ Attr.class "time-icon", Attr.attribute "aria-hidden" "true" ] [ text "◷" ]
                 , text (Domain.windowToGerman displayedWindow)
                 ]
+            , viewEventTags event.tags
             , viewComment event.comment
             , viewCompletionControl event
             , viewRecurrencePreview previewStart event
             ]
         ]
+
+
+viewEventTags : List Domain.Tag -> Html msg
+viewEventTags tags =
+    if List.isEmpty tags then
+        text ""
+
+    else
+        div [ Attr.class "event-tags" ]
+            (List.map
+                (\tag ->
+                    span [ Attr.class "event-tag" ]
+                        [ text (Domain.tagToString tag) ]
+                )
+                tags
+            )
 
 
 occurrenceForFilter : DateFilter -> Event -> Maybe Occurrence
@@ -1162,6 +1260,17 @@ editorDialog heading submitLabel model =
                         , assignmentChoice model.form.assignment BothPeople
                         ]
                     ]
+                , field "Tags"
+                    False
+                    (input
+                        [ Attr.type_ "text"
+                        , Attr.placeholder "z. B. Bericht, Frist, Gespräch"
+                        , Attr.value model.form.tags
+                        , Attr.attribute "autocomplete" "off"
+                        , onInput ChangeTags
+                        ]
+                        []
+                    )
                 , field "Kommentar / zu erledigen"
                     False
                     (textarea
@@ -1349,6 +1458,7 @@ button { color: inherit; }
 .filter-pills { display: flex; padding: 3px; background: #e8e9e2; border-radius: 9px; }
 .filter-pill { height: 32px; padding: 0 13px; border: 0; background: transparent; border-radius: 7px; color: #747d77; cursor: pointer; font-size: 10px; font-weight: 750; }
 .filter-pill.is-active { background: var(--surface); color: var(--ink); box-shadow: 0 2px 8px rgba(32,42,35,.08); }
+.tag-filter-row { margin: -5px 0 17px; display: flex; align-items: center; gap: 9px; min-width: 0; }.tag-filter-label { color: #7a837d; font-size: 9px; font-weight: 850; letter-spacing: .8px; text-transform: uppercase; }.tag-filter-pills { min-width: 0; max-width: 100%; overflow-x: auto; }.tag-filter-pills .filter-pill { flex: 0 0 auto; white-space: nowrap; }
 .date-filter-panel { margin-bottom: 18px; padding: 14px 16px; display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap; background: rgba(255,254,250,.72); border: 1px solid var(--line); border-radius: 12px; }
 .date-filter-heading { min-width: 190px; margin-right: auto; display: flex; align-items: center; gap: 11px; align-self: center; }
 .date-filter-heading > div { display: flex; flex-direction: column; gap: 3px; }.date-filter-icon { width: 30px; height: 30px; display: grid; place-items: center; flex: 0 0 auto; background: var(--green-soft); border-radius: 8px; color: var(--green); }
@@ -1385,6 +1495,7 @@ button { color: inherit; }
 .icon-button.danger:hover { color: #a7433d; background: #faeeee; border-color: #ecd0ce; }
 .event-time { display: flex; align-items: center; gap: 7px; color: #667069; font-size: 12px; }
 .time-icon { color: var(--green); font-size: 17px; }
+.event-tags { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 5px; }.event-tag { padding: 4px 8px; background: var(--green-soft); border-radius: 12px; color: var(--green); font-size: 9px; font-weight: 750; }
 .comment-box { margin-top: 18px; padding: 13px 15px; display: flex; gap: 12px; background: #f5f5ef; border-left: 2px solid #aac166; border-radius: 0 8px 8px 0; }
 .comment-mark { width: 20px; height: 20px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 50%; background: var(--lime); color: var(--green); font-size: 10px; font-weight: 900; }
 .comment-label, .preview-label { display: block; color: #879087; font-size: 8px; font-weight: 900; letter-spacing: 1.2px; }
@@ -1456,7 +1567,7 @@ button { color: inherit; }
 @media (max-width: 620px) {
   .topbar { height: 70px; padding: 0 18px; }.brand-subtitle, .hide-mobile { display: none; }.brand-mark { width: 36px; height: 36px; }.brand-name { font-size: 18px; }
   .topbar .button { min-height: 39px; padding: 0 13px; }.page { width: calc(100% - 28px); }
-  .events-section { margin-top: 28px; }.filter-groups { align-items: flex-start; flex-direction: column; overflow-x: visible; padding-bottom: 3px; }.filter-pills { max-width: 100%; overflow-x: auto; }.recurrence-pills { order: -1; }
+  .events-section { margin-top: 28px; }.filter-groups { align-items: flex-start; flex-direction: column; overflow-x: visible; padding-bottom: 3px; }.filter-pills { max-width: 100%; overflow-x: auto; }.recurrence-pills { order: -1; }.tag-filter-row { align-items: flex-start; flex-direction: column; gap: 5px; }
   .date-filter-panel { padding: 13px; align-items: stretch; flex-direction: column; gap: 13px; }.date-filter-heading { width: auto; min-width: 0; margin: 0; }.date-filter-controls { width: 100%; align-items: stretch; flex-direction: column; gap: 9px; }.filter-or { display: none; }.month-field select { width: 100%; }.range-fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; }.date-filter-field input, .date-filter-field select { width: 100%; max-width: 100%; font-size: 16px; }.apply-range-button { grid-column: 1 / -1; }.date-filter-error { margin-top: -4px; }
   .event-card { grid-template-columns: 69px 1fr; }.date-block { padding-top: 31px; }.date-day { font-size: 31px; }.event-main { padding: 20px 17px; }.event-title { font-size: 21px; }.event-head { gap: 8px; }.person-badge { font-size: 0; }
   .preview-dates { grid-template-columns: 1fr; gap: 5px; }.occurrence-button { min-height: 35px; }
