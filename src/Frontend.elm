@@ -4,7 +4,7 @@ import Browser exposing (UrlRequest(..))
 import Browser.Navigation as Nav
 import Char
 import Domain exposing (Assignment(..), Comment(..), Event, EventDraft, EventId, Occurrence, Person(..), Recurrence(..))
-import Html exposing (Html, button, div, h1, h2, h3, header, input, label, main_, node, option, p, select, span, text, textarea)
+import Html exposing (Attribute, Html, button, div, h1, h2, h3, header, input, label, main_, node, option, p, select, span, text, textarea)
 import Html.Attributes as Attr
 import Html.Events exposing (onClick, onInput)
 import Lamdera
@@ -576,27 +576,38 @@ tagFilterButton selectedFilter tag =
                     Domain.tagEquals selectedTag tag
     in
     button
-        [ Attr.classList
-            [ ( "filter-pill tag-filter-pill " ++ tagColorClass tag, True )
+        ([ Attr.classList
+            [ ( "filter-pill tag-filter-pill", True )
             , ( "is-active", isActive )
             ]
-        , onClick (ChangeTagFilter (TaggedWith tag))
-        ]
+         , onClick (ChangeTagFilter (TaggedWith tag))
+         ]
+            ++ tagColorAttributes tag
+        )
         [ text (Domain.tagToString tag) ]
 
 
-tagColorClass : Domain.Tag -> String
-tagColorClass tag =
+tagColorAttributes : Domain.Tag -> List (Attribute msg)
+tagColorAttributes tag =
     let
-        colorIndex =
+        hue =
             tag
                 |> Domain.tagToString
                 |> String.toLower
                 |> String.toList
-                |> List.foldl (\character total -> total + Char.toCode character) 0
-                |> modBy 6
+                |> List.foldl
+                    (\character hash ->
+                        modBy 360 (hash * 31 + Char.toCode character)
+                    )
+                    0
+
+        hueValue =
+            String.fromInt hue
     in
-    "tag-color-" ++ String.fromInt colorIndex
+    [ Attr.style "--tag-bg" ("hsl(" ++ hueValue ++ " 38% 92%)")
+    , Attr.style "--tag-border" ("hsl(" ++ hueValue ++ " 32% 82%)")
+    , Attr.style "--tag-ink" ("hsl(" ++ hueValue ++ " 42% 30%)")
+    ]
 
 
 viewDateFilter : Model -> Html FrontendMsg
@@ -930,7 +941,8 @@ viewEventTags tags =
         div [ Attr.class "event-tags" ]
             (List.map
                 (\tag ->
-                    span [ Attr.class ("event-tag " ++ tagColorClass tag) ]
+                    span
+                        (Attr.class "event-tag" :: tagColorAttributes tag)
                         [ text (Domain.tagToString tag) ]
                 )
                 tags
@@ -1518,12 +1530,6 @@ button { color: inherit; }
 .event-time { display: flex; align-items: center; gap: 7px; color: #667069; font-size: 12px; }
 .time-icon { color: var(--green); font-size: 17px; }
 .event-tags { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 5px; }.event-tag { padding: 4px 8px; background: var(--tag-bg); border: 1px solid var(--tag-border); border-radius: 12px; color: var(--tag-ink); font-size: 9px; font-weight: 750; }
-.tag-color-0 { --tag-bg: #e3eee6; --tag-border: #c8ddce; --tag-ink: #21543d; }
-.tag-color-1 { --tag-bg: #f5e6dc; --tag-border: #ead0bf; --tag-ink: #9a4b25; }
-.tag-color-2 { --tag-bg: #e9e4f0; --tag-border: #d8cde6; --tag-ink: #655483; }
-.tag-color-3 { --tag-bg: #e1edf2; --tag-border: #c4dce5; --tag-ink: #326276; }
-.tag-color-4 { --tag-bg: #f3e8ec; --tag-border: #e5ced7; --tag-ink: #8a4960; }
-.tag-color-5 { --tag-bg: #f1edda; --tag-border: #e1d9b8; --tag-ink: #746327; }
 .comment-box { margin-top: 18px; padding: 13px 15px; display: flex; gap: 12px; background: #f5f5ef; border-left: 2px solid #aac166; border-radius: 0 8px 8px 0; }
 .comment-mark { width: 20px; height: 20px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 50%; background: var(--lime); color: var(--green); font-size: 10px; font-weight: 900; }
 .comment-label, .preview-label { display: block; color: #879087; font-size: 8px; font-weight: 900; letter-spacing: 1.2px; }
