@@ -852,7 +852,16 @@ toggleOccurrenceCompletion ((OccurrenceIndex rawIndex) as index) event =
         }
 
     else
-        { event | completedOccurrences = index :: event.completedOccurrences }
+        { event
+            | completedOccurrences = index :: event.completedOccurrences
+            , todos =
+                case event.recurrence of
+                    OneTime ->
+                        event.todos
+
+                    EveryYear ->
+                        List.map (\todo -> { todo | status = TodoOpen }) event.todos
+        }
 
 
 toggleTodoCompletion : TodoId -> Event -> Event

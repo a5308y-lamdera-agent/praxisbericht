@@ -44,7 +44,8 @@ synchronisiert jede Änderung an alle verbundenen Clients. Die Oberfläche in
 `src/Frontend.elm` bietet Erstellen, Kopieren, Bearbeiten, Löschen, Suche,
 Filter und eine Vorschau wiederkehrender Termine mit einzeln abhakbaren
 Instanzen. Pro Termin lassen sich außerdem mehrere Todo-Einträge anlegen und
-direkt auf der Terminkarte einzeln abhaken. Beim Kopieren werden die
+direkt auf der Terminkarte einzeln abhaken. Beim Abhaken einer Serieninstanz
+werden ihre Todos für die nächste Instanz zurückgesetzt. Beim Kopieren werden die
 Termindetails in einen neuen Entwurf übernommen; Erledigt-Zustände bleiben
 bewusst beim Original. Tags werden im Editor kommasepariert gepflegt, auf den
 Terminkarten angezeigt und stehen als Filter zur Verfügung.
