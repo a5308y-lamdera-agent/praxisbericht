@@ -60,6 +60,7 @@ emptyForm =
     , recurrence = OneTime
     , assignment = OnlyPerson PersonA
     , tags = ""
+    , todos = ""
     , comment = ""
     }
 
@@ -165,6 +166,9 @@ update msg model =
 
         ChangeTags value ->
             ( updateForm (\form -> { form | tags = value }) model, Cmd.none )
+
+        ChangeTodos value ->
+            ( updateForm (\form -> { form | todos = value }) model, Cmd.none )
 
         ChangeComment value ->
             ( updateForm (\form -> { form | comment = value }) model, Cmd.none )
@@ -296,6 +300,11 @@ update msg model =
             , Lamdera.sendToBackend (ToggleOccurrenceCompletion eventId occurrenceIndex)
             )
 
+        ToggleTodo eventId todoId ->
+            ( { model | syncState = Saving, notice = Nothing }
+            , Lamdera.sendToBackend (ToggleTodoCompletion eventId todoId)
+            )
+
         DismissNotice ->
             ( { model | notice = Nothing }, Cmd.none )
 
@@ -361,6 +370,7 @@ formToDraft form =
                                                                     , recurrence = form.recurrence
                                                                     , assignment = form.assignment
                                                                     , tags = Domain.tagsFromString form.tags
+                                                                    , todos = Domain.todosFromString form.todos
                                                                     , comment = Domain.commentFromString form.comment
                                                                     }
                                                                 )
@@ -392,6 +402,7 @@ formFromEvent event =
     , recurrence = event.recurrence
     , assignment = event.assignment
     , tags = Domain.tagsToString event.tags
+    , todos = Domain.todosToString (List.map .text event.todos)
     , comment = Domain.commentToString event.comment
     }
 
@@ -788,6 +799,8 @@ matchesSearch search event =
                     ++ Domain.commentToString event.comment
                     ++ " "
                     ++ Domain.tagsToString event.tags
+                    ++ " "
+                    ++ (event.todos |> List.map (.text >> Domain.todoTextToString) |> String.join " ")
                 )
     in
     String.isEmpty needle || String.contains needle haystack
@@ -926,6 +939,7 @@ viewEventCard filter event =
                 ]
             , viewEventTags event.tags
             , viewComment event.comment
+            , viewTodos event
             , viewCompletionControl event
             , viewRecurrencePreview previewStart event
             ]
@@ -1041,10 +1055,57 @@ viewComment comment =
             div [ Attr.class "comment-box" ]
                 [ span [ Attr.class "comment-mark", Attr.attribute "aria-hidden" "true" ] [ text "→" ]
                 , div []
-                    [ span [ Attr.class "comment-label" ] [ text "ZU ERLEDIGEN" ]
+                    [ span [ Attr.class "comment-label" ] [ text "KOMMENTAR" ]
                     , p [] [ text value ]
                     ]
                 ]
+
+
+viewTodos : Event -> Html FrontendMsg
+viewTodos event =
+    if List.isEmpty event.todos then
+        text ""
+
+    else
+        div [ Attr.class "todo-list" ]
+            (span [ Attr.class "todo-list-label" ] [ text "TODOS" ]
+                :: List.map (viewTodo event.id) event.todos
+            )
+
+
+viewTodo : EventId -> Domain.TodoItem -> Html FrontendMsg
+viewTodo eventId todo =
+    let
+        isCompleted =
+            todo.status == Domain.TodoCompleted
+
+        todoLabel =
+            Domain.todoTextToString todo.text
+    in
+    button
+        [ Attr.classList
+            [ ( "todo-item", True )
+            , ( "is-completed", isCompleted )
+            ]
+        , Attr.attribute "aria-pressed"
+            (if isCompleted then
+                "true"
+
+             else
+                "false"
+            )
+        , Attr.attribute "aria-label"
+            (if isCompleted then
+                todoLabel ++ " wieder öffnen"
+
+             else
+                todoLabel ++ " als erledigt markieren"
+            )
+        , onClick (ToggleTodo eventId todo.id)
+        ]
+        [ completionCheck isCompleted
+        , span [ Attr.class "todo-text" ] [ text todoLabel ]
+        ]
 
 
 viewCompletionControl : Event -> Html FrontendMsg
@@ -1305,10 +1366,20 @@ editorDialog heading submitLabel model =
                         ]
                         []
                     )
-                , field "Kommentar / zu erledigen"
+                , field "Todos"
                     False
                     (textarea
-                        [ Attr.placeholder "Was muss für dieses Ereignis vorbereitet oder erledigt werden?"
+                        [ Attr.placeholder "Ein Todo pro Zeile, z. B. Unterlagen zusammenstellen"
+                        , Attr.value model.form.todos
+                        , Attr.rows 4
+                        , onInput ChangeTodos
+                        ]
+                        []
+                    )
+                , field "Kommentar"
+                    False
+                    (textarea
+                        [ Attr.placeholder "Zusätzliche Hinweise zu diesem Ereignis"
                         , Attr.value model.form.comment
                         , Attr.rows 4
                         , onInput ChangeComment
@@ -1534,6 +1605,7 @@ button { color: inherit; }
 .comment-mark { width: 20px; height: 20px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 50%; background: var(--lime); color: var(--green); font-size: 10px; font-weight: 900; }
 .comment-label, .preview-label { display: block; color: #879087; font-size: 8px; font-weight: 900; letter-spacing: 1.2px; }
 .comment-box p { margin: 4px 0 0; color: #4f5b53; font-size: 11px; line-height: 1.45; white-space: pre-wrap; }
+.todo-list { margin-top: 15px; display: grid; gap: 6px; }.todo-list-label { margin-bottom: 2px; color: #879087; font-size: 8px; font-weight: 900; letter-spacing: 1.2px; }.todo-item { width: 100%; min-height: 38px; padding: 8px 11px; display: flex; align-items: center; gap: 9px; text-align: left; background: #f8f9f5; border: 1px solid #dfe3db; border-radius: 8px; cursor: pointer; }.todo-item:hover { border-color: #aab8ad; background: #f4f7f2; }.todo-item.is-completed { background: #edf5ee; border-color: #b7cdbb; }.todo-text { color: #4f5b53; font-size: 11px; line-height: 1.4; }.todo-item.is-completed .todo-text { color: #6f7d73; text-decoration: line-through; }
 .completion-toggle { width: 100%; margin-top: 15px; padding: 11px 13px; display: flex; align-items: center; gap: 11px; text-align: left; background: white; border: 1px solid #d9ddd5; border-radius: 9px; cursor: pointer; }
 .completion-toggle:hover { border-color: #93a99a; background: #f8faf7; }
 .completion-toggle.is-completed { background: #edf5ee; border-color: #94b09b; }
