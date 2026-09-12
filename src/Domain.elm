@@ -15,6 +15,10 @@ module Domain exposing
     , Recurrence(..)
     , Tag(..)
     , TimeWindow(..)
+    , TodoId(..)
+    , TodoItem
+    , TodoStatus(..)
+    , TodoText(..)
     , allMonths
     , assignmentIncludes
     , assignmentLabel
@@ -51,7 +55,11 @@ module Domain exposing
     , timeFromIso
     , timeToIso
     , timeWindow
+    , todoTextToString
+    , todosFromString
+    , todosToString
     , toggleOccurrenceCompletion
+    , toggleTodoCompletion
     , uniqueTags
     , updateEventFromDraft
     , windowEnd
@@ -93,6 +101,26 @@ type Comment
 
 type Tag
     = Tag String
+
+
+type TodoId
+    = TodoId Int
+
+
+type TodoText
+    = TodoText String
+
+
+type TodoStatus
+    = TodoOpen
+    | TodoCompleted
+
+
+type alias TodoItem =
+    { id : TodoId
+    , text : TodoText
+    , status : TodoStatus
+    }
 
 
 type CalendarDate
@@ -163,6 +191,7 @@ type alias EventDraft =
     , recurrence : Recurrence
     , assignment : Assignment
     , tags : List Tag
+    , todos : List TodoText
     , comment : Comment
     }
 
@@ -174,6 +203,8 @@ type alias Event =
     , recurrence : Recurrence
     , assignment : Assignment
     , tags : List Tag
+    , todos : List TodoItem
+    , nextTodoId : Int
     , comment : Comment
     , completedOccurrences : List OccurrenceIndex
     }
@@ -262,6 +293,66 @@ uniqueTags tags =
         []
         tags
         |> List.reverse
+
+
+todoTextToString : TodoText -> String
+todoTextToString (TodoText value) =
+    value
+
+
+todosFromString : String -> List TodoText
+todosFromString value =
+    value
+        |> String.lines
+        |> List.map TodoText
+        |> normalizeTodos
+
+
+todosToString : List TodoText -> String
+todosToString todos =
+    todos
+        |> List.map todoTextToString
+        |> String.join "\n"
+
+
+todoTextFromString : String -> Maybe TodoText
+todoTextFromString value =
+    let
+        cleaned =
+            String.trim value
+    in
+    if String.isEmpty cleaned then
+        Nothing
+
+    else
+        Just (TodoText cleaned)
+
+
+uniqueTodos : List TodoText -> List TodoText
+uniqueTodos todos =
+    List.foldl
+        (\todo unique ->
+            if List.any (todoTextEquals todo) unique then
+                unique
+
+            else
+                todo :: unique
+        )
+        []
+        todos
+        |> List.reverse
+
+
+normalizeTodos : List TodoText -> List TodoText
+normalizeTodos todos =
+    todos
+        |> List.filterMap (todoTextToString >> todoTextFromString)
+        |> uniqueTodos
+
+
+todoTextEquals : TodoText -> TodoText -> Bool
+todoTextEquals first second =
+    String.toLower (todoTextToString first) == String.toLower (todoTextToString second)
 
 
 eventHasTag : Tag -> Event -> Bool
@@ -577,12 +668,26 @@ windowToGerman window =
 
 eventFromDraft : EventId -> EventDraft -> Event
 eventFromDraft id draft =
+    let
+        todos =
+            draft.todos
+                |> normalizeTodos
+                |> List.indexedMap
+                    (\index todoText ->
+                        { id = TodoId (index + 1)
+                        , text = todoText
+                        , status = TodoOpen
+                        }
+                    )
+    in
     { id = id
     , title = String.trim draft.title
     , window = draft.window
     , recurrence = draft.recurrence
     , assignment = draft.assignment
     , tags = uniqueTags draft.tags
+    , todos = todos
+    , nextTodoId = List.length todos + 1
     , comment = draft.comment
     , completedOccurrences = []
     }
@@ -596,6 +701,8 @@ updateEventFromDraft draft event =
         , recurrence = draft.recurrence
         , assignment = draft.assignment
         , tags = uniqueTags draft.tags
+        , todos = reconcileTodos draft.todos event
+        , nextTodoId = nextTodoIdAfterReconcile draft.todos event
         , comment = draft.comment
     }
 
@@ -607,6 +714,7 @@ eventToDraft event =
     , recurrence = event.recurrence
     , assignment = event.assignment
     , tags = event.tags
+    , todos = List.map .text event.todos
     , comment = event.comment
     }
 
@@ -744,7 +852,72 @@ toggleOccurrenceCompletion ((OccurrenceIndex rawIndex) as index) event =
         }
 
     else
-        { event | completedOccurrences = index :: event.completedOccurrences }
+        { event
+            | completedOccurrences = index :: event.completedOccurrences
+            , todos =
+                case event.recurrence of
+                    OneTime ->
+                        event.todos
+
+                    EveryYear ->
+                        List.map (\todo -> { todo | status = TodoOpen }) event.todos
+        }
+
+
+toggleTodoCompletion : TodoId -> Event -> Event
+toggleTodoCompletion todoId event =
+    { event
+        | todos =
+            List.map
+                (\todo ->
+                    if todo.id == todoId then
+                        { todo
+                            | status =
+                                case todo.status of
+                                    TodoOpen ->
+                                        TodoCompleted
+
+                                    TodoCompleted ->
+                                        TodoOpen
+                        }
+
+                    else
+                        todo
+                )
+                event.todos
+    }
+
+
+reconcileTodos : List TodoText -> Event -> List TodoItem
+reconcileTodos requestedTodos event =
+    requestedTodos
+        |> normalizeTodos
+        |> List.foldl
+            (\todoText ( nextId, reversedTodos ) ->
+                case List.filter (\todo -> todoTextEquals todoText todo.text) event.todos |> List.head of
+                    Just existingTodo ->
+                        ( nextId, { existingTodo | text = todoText } :: reversedTodos )
+
+                    Nothing ->
+                        ( nextId + 1
+                        , { id = TodoId nextId, text = todoText, status = TodoOpen } :: reversedTodos
+                        )
+            )
+            ( event.nextTodoId, [] )
+        |> Tuple.second
+        |> List.reverse
+
+
+nextTodoIdAfterReconcile : List TodoText -> Event -> Int
+nextTodoIdAfterReconcile requestedTodos event =
+    requestedTodos
+        |> normalizeTodos
+        |> List.filter
+            (\todoText ->
+                not (List.any (\todo -> todoTextEquals todoText todo.text) event.todos)
+            )
+        |> List.length
+        |> (+) event.nextTodoId
 
 
 shiftWindow : Int -> TimeWindow -> TimeWindow

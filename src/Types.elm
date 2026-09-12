@@ -2,7 +2,7 @@ module Types exposing (..)
 
 import Browser exposing (UrlRequest)
 import Browser.Navigation exposing (Key)
-import Domain exposing (Assignment, CalendarRange, Event, EventDraft, EventId, MonthOfYear, OccurrenceIndex, Person, Recurrence, Tag)
+import Domain exposing (Assignment, CalendarRange, Event, EventDraft, EventId, MonthOfYear, OccurrenceIndex, Person, Recurrence, Tag, TodoId)
 import Url exposing (Url)
 
 
@@ -33,6 +33,7 @@ type alias EventForm =
     , recurrence : Recurrence
     , assignment : Assignment
     , tags : String
+    , todos : String
     , comment : String
     }
 
@@ -101,6 +102,7 @@ type FrontendMsg
     | ChangeRecurrence Recurrence
     | ChangeAssignment Assignment
     | ChangeTags String
+    | ChangeTodos String
     | ChangeComment String
     | SubmitEvent
     | ChangePersonFilter PersonFilter
@@ -117,6 +119,7 @@ type FrontendMsg
     | CancelDelete
     | ConfirmDelete EventId
     | ToggleOccurrence EventId OccurrenceIndex
+    | ToggleTodo EventId TodoId
     | DismissNotice
 
 
@@ -126,6 +129,7 @@ type ToBackend
     | UpdateEvent EventId EventDraft
     | DeleteEvent EventId
     | ToggleOccurrenceCompletion EventId OccurrenceIndex
+    | ToggleTodoCompletion EventId TodoId
 
 
 type BackendMsg

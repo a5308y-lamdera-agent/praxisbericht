@@ -28,6 +28,7 @@ verwendet es fachliche Typen:
 - `CalendarDate`, `ClockTime`, `Moment` und `TimeWindow` für validierte Zeiträume
 - `Comment` für explizit vorhandene oder fehlende Kommentare
 - `Tag` und `List Tag` für normalisierte, mehrfach vergebbare Schlagwörter
+- `TodoId`, `TodoText` und `TodoStatus` für stabile, einzeln abhakbare Aufgaben
 - `EventDraft` für noch nicht persistierte und `Event` für gespeicherte Termine
 
 Datums-, Uhrzeit- und Zeitfenster-Konstruktoren validieren ihre Eingaben. So
@@ -42,10 +43,12 @@ Das Lamdera-Backend in `src/Backend.elm` vergibt IDs, hält die Terminliste und
 synchronisiert jede Änderung an alle verbundenen Clients. Die Oberfläche in
 `src/Frontend.elm` bietet Erstellen, Kopieren, Bearbeiten, Löschen, Suche,
 Filter und eine Vorschau wiederkehrender Termine mit einzeln abhakbaren
-Instanzen. Beim Kopieren werden die Termindetails in einen neuen Entwurf
-übernommen; Erledigt-Zustände bleiben bewusst beim Original. Tags werden im
-Editor kommasepariert gepflegt, auf den Terminkarten angezeigt und stehen als
-Filter zur Verfügung.
+Instanzen. Pro Termin lassen sich außerdem mehrere Todo-Einträge anlegen und
+direkt auf der Terminkarte einzeln abhaken. Beim Abhaken einer Serieninstanz
+werden ihre Todos für die nächste Instanz zurückgesetzt. Beim Kopieren werden die
+Termindetails in einen neuen Entwurf übernommen; Erledigt-Zustände bleiben
+bewusst beim Original. Tags werden im Editor kommasepariert gepflegt, auf den
+Terminkarten angezeigt und stehen als Filter zur Verfügung.
 
 Die Terminliste kann zusätzlich entweder nach einem Kalendermonat unabhängig
 vom Jahr oder nach einem frei gewählten, inklusiven Datumsbereich gefiltert
